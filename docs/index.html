@@ -73,29 +73,71 @@
 
   <section class="card" id="section-step1">
     <h2>1. File check TOP &amp; đề xuất anchor text</h2>
-    <p class="hint">Tương ứng agent <code>seo-offpage-technical</code>.</p>
+    <p class="hint">Tương ứng agent <code>seo-offpage-technical</code>. Gồm 2 phần — bấm 1 nút chạy cả 2, nhưng đầu vào cần cho từng phần khác nhau:</p>
 
-    <div class="row">
-      <label>Tên dự án &nbsp;<input type="text" id="projectName" placeholder="VD: Hợp Trí" /></label>
+    <div class="sub-block">
+      <div class="sub-block-head">
+        <span class="badge badge-free">🆓 Miễn phí</span>
+        <h3>1a. Thống kê TOP &amp; lọc từ khoá ứng viên</h3>
+      </div>
+      <p class="hint">Chạy bằng JS ngay trong trình duyệt bạn — không gọi API, không tốn phí dù file dài mấy nghìn dòng.</p>
+
+      <div class="row">
+        <label>Tên dự án &nbsp;<input type="text" id="projectName" placeholder="VD: Hợp Trí" /></label>
+      </div>
+
+      <table class="input-req-table">
+        <tr><th>Input</th><th>Bắt buộc?</th><th>Ghi chú</th></tr>
+        <tr>
+          <td>Tên dự án</td>
+          <td><span class="tag-optional">Tuỳ chọn</span></td>
+          <td>Chỉ để đặt tên file Excel xuất ra cuối cùng.</td>
+        </tr>
+        <tr>
+          <td>File check TOP (1 file / bộ từ khoá)</td>
+          <td><span class="tag-required">Bắt buộc</span> — ít nhất 1 file</td>
+          <td>
+            CSV. Công cụ tự nhận diện 3 cột, không cần đúng tên/thứ tự cột:
+            <ul>
+              <li><strong>Từ khoá</strong> — cột chứa từ khoá/anchor text.</li>
+              <li><strong>TOP hiện tại (mới nhất)</strong> — thứ hạng hiện tại, không phải cột lịch sử theo ngày. Nếu file có cột "Now" hoặc tương đương, công cụ ưu tiên chọn cột đó.</li>
+              <li><strong>URL</strong> — trang đích của từ khoá.</li>
+            </ul>
+            Các cột khác (Volume, DA, ghi chú...) không bắt buộc, công cụ bỏ qua, không cần xoá.
+          </td>
+        </tr>
+      </table>
+
+      <div id="btkList"></div>
+      <button type="button" class="btn-secondary" id="addBtkBtn">+ Thêm bộ từ khoá (BTK) khác</button>
     </div>
 
-    <div class="input-note">
-      <strong>File check TOP cần gì?</strong> Công cụ tự nhận diện 3 cột trong file bạn upload — không cần đặt đúng tên cột, không cần đúng thứ tự cột:
-      <ul>
-        <li><strong>Từ khoá</strong> — cột chứa từ khoá/anchor text.</li>
-        <li><strong>TOP hiện tại (mới nhất)</strong> — thứ hạng hiện tại, không phải cột lịch sử theo ngày. Nếu file có cột tên "Now" hoặc tương đương, công cụ ưu tiên chọn cột đó.</li>
-        <li><strong>URL</strong> — trang đích của từ khoá đó.</li>
-      </ul>
-      Các cột khác trong file (Volume, DA, ghi chú...) không bắt buộc — công cụ bỏ qua, không ảnh hưởng kết quả, bạn không cần xoá chúng đi.
-    </div>
+    <div class="sub-block">
+      <div class="sub-block-head">
+        <span class="badge badge-paid">💰 Cần API key</span>
+        <h3>1b. Ghép cụm anchor text theo chủ đề</h3>
+      </div>
+      <p class="hint">
+        Nhận đầu vào tự động từ kết quả 1a (danh sách từ khoá ứng viên đã lọc sẵn, không phải file gốc) — bạn không cần nhập lại gì thêm ở đây, trừ khi có KPI cần xét.
+      </p>
 
-    <div id="btkList"></div>
-    <button type="button" class="btn-secondary" id="addBtkBtn">+ Thêm bộ từ khoá (BTK) khác</button>
-
-    <div class="row">
-      <label>File KPI (tuỳ chọn, CSV) &nbsp;<input type="file" id="kpiFile" accept=".csv,.txt" /></label>
+      <table class="input-req-table">
+        <tr><th>Input</th><th>Bắt buộc?</th><th>Ghi chú</th></tr>
+        <tr>
+          <td>Danh sách ứng viên từ 1a</td>
+          <td><span class="tag-optional">Tự động</span></td>
+          <td>Không cần thao tác — công cụ tự chuyển kết quả 1a sang đây.</td>
+        </tr>
+        <tr>
+          <td>File KPI</td>
+          <td><span class="tag-optional">Tuỳ chọn</span></td>
+          <td>CSV. Có file này, công cụ ưu tiên thêm từ khoá cần đẩy để đạt KPI gần hơn (VD TOP5), kể cả khi từ đó đã TOP1-10.</td>
+        </tr>
+      </table>
+      <div class="row">
+        <label>File KPI (tuỳ chọn, CSV) &nbsp;<input type="file" id="kpiFile" accept=".csv,.txt" /></label>
+      </div>
     </div>
-    <p class="hint">Có file KPI thì công cụ sẽ ưu tiên thêm các từ khoá cần đẩy để đạt KPI, kể cả khi từ đó đã TOP1-10.</p>
 
     <button type="button" class="btn-primary" id="runStage1Btn">Phân tích Anchor Text</button>
     <div class="status" id="stage1Status"></div>

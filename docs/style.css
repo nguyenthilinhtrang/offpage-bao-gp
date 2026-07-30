@@ -104,12 +104,12 @@ input[type="file"] { color: var(--text); font-size: 0.88rem; }
 .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
 .btk-row {
-  display: flex;
-  gap: 0.8rem;
-  align-items: center;
-  margin-bottom: 0.6rem;
-  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.7rem;
 }
+.btk-row .row { margin-bottom: 0.5rem; }
 .btk-row input[type="file"] { flex: 1; min-width: 180px; }
 .remove-btk {
   background: transparent;
@@ -120,6 +120,17 @@ input[type="file"] { color: var(--text); font-size: 0.88rem; }
   cursor: pointer;
   font-size: 0.85rem;
 }
+
+.btk-col-confirm {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: rgba(79, 140, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.85rem;
+}
+.btk-col-confirm select { max-width: 240px; }
 
 .status {
   margin-top: 0.6rem;
@@ -171,29 +182,6 @@ code {
 
 a { color: var(--accent); }
 
-.pipeline-steps {
-  padding-left: 1.3rem;
-  margin: 0.8rem 0;
-}
-.pipeline-steps li { margin-bottom: 0.5rem; }
-
-.cost-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0;
-  font-size: 0.88rem;
-}
-.cost-table th, .cost-table td {
-  border: 1px solid var(--border);
-  padding: 0.6rem 0.7rem;
-  text-align: left;
-  vertical-align: top;
-}
-.cost-table th { background: rgba(79, 140, 255, 0.12); }
-.cost-table td:first-child { font-weight: 600; white-space: nowrap; }
-.cost-table th:nth-child(2), .cost-table td:nth-child(2) { border-left: 3px solid var(--ok); }
-.cost-table th:nth-child(3), .cost-table td:nth-child(3) { border-left: 3px solid #e0c25a; }
-
 .input-note {
   background: rgba(79, 140, 255, 0.07);
   border: 1px solid var(--border);
@@ -234,30 +222,3 @@ a { color: var(--accent); }
   .badge-paid { color: #e0c25a; }
 }
 
-.input-req-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.6rem 0 0.9rem;
-  font-size: 0.85rem;
-}
-.input-req-table th, .input-req-table td {
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.65rem;
-  text-align: left;
-  vertical-align: top;
-}
-.input-req-table th { background: rgba(127,127,127,0.08); font-size: 0.8rem; }
-.input-req-table td:first-child { font-weight: 600; white-space: nowrap; }
-.input-req-table ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
-.input-req-table li { margin-bottom: 0.2rem; }
-
-.tag-required, .tag-optional {
-  display: inline-block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: 6px;
-  white-space: nowrap;
-}
-.tag-required { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
-.tag-optional { background: rgba(127,127,127,0.15); color: var(--muted); }

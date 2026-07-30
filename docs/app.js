@@ -11,52 +11,6 @@ const CONFIG = {
   MAX_TOKENS_STAGE2: 8000,
 };
 
-// ---------- API key persistence ----------
-const apiKeyInput = document.getElementById("apiKey");
-const saveKeyCheckbox = document.getElementById("saveKey");
-const modelSelect = document.getElementById("model");
-
-(function loadSavedKey() {
-  const saved = localStorage.getItem("offpage_api_key");
-  if (saved) apiKeyInput.value = saved;
-})();
-
-apiKeyInput.addEventListener("change", () => {
-  if (saveKeyCheckbox.checked) {
-    localStorage.setItem("offpage_api_key", apiKeyInput.value.trim());
-  }
-});
-saveKeyCheckbox.addEventListener("change", () => {
-  if (!saveKeyCheckbox.checked) localStorage.removeItem("offpage_api_key");
-});
-
-function getApiKey() {
-  return apiKeyInput.value.trim();
-}
-
-// ---------- BTK dynamic list ----------
-const btkList = document.getElementById("btkList");
-let btkCounter = 0;
-
-function addBtkRow() {
-  btkCounter += 1;
-  const id = btkCounter;
-  const row = document.createElement("div");
-  row.className = "btk-row";
-  row.dataset.id = id;
-  row.innerHTML = `
-    <input type="text" class="btk-name" placeholder="Tên BTK (VD: Thương hiệu)" value="BTK ${id}" />
-    <input type="file" class="btk-file" accept=".csv,.txt" />
-    <button type="button" class="remove-btk">Xoá</button>
-  `;
-  row.querySelector(".remove-btk").addEventListener("click", () => {
-    if (btkList.children.length > 1) row.remove();
-  });
-  btkList.appendChild(row);
-}
-document.getElementById("addBtkBtn").addEventListener("click", addBtkRow);
-addBtkRow();
-
 // ---------- helpers ----------
 function readFileAsText(file) {
   return new Promise((resolve, reject) => {
@@ -75,6 +29,12 @@ function estimateTokens(text) {
 function setStatus(el, text, kind) {
   el.textContent = text;
   el.className = "status" + (kind ? " " + kind : "");
+}
+
+function esc(s) {
+  const div = document.createElement("div");
+  div.textContent = s == null ? "" : String(s);
+  return div.innerHTML;
 }
 
 async function fetchGoogleSheetCsv(url) {
@@ -130,44 +90,23 @@ function findColumnIndex(headerRow, aliases) {
   return -1;
 }
 
-/**
- * Nhận diện cột Từ khoá / URL / TOP hiện tại bằng 1 lệnh gọi Claude RẤT nhỏ
- * (chỉ gửi header + vài dòng mẫu, không gửi toàn bộ file — gần như miễn phí).
- * BẮT BUỘC dùng LLM ở bước này thay vì alias-matching thuần JS: đã test thực tế
- * với file check TOP thật trong repo và phát hiện lỗi — cột "TOP lên AIO" (chỉ số
- * AIO overview, không phải rank) đứng trước cột "Now" (cột TOP thật theo quy ước
- * CLAUDE.md) và trùng khớp alias "top", khiến matcher JS thuần chọn NHẦM cột, ra
- * kết quả sai hoàn toàn mà không báo lỗi. Tên cột tiếng Việt biến thiên quá nhiều
- * giữa các dự án (kể cả 2 cách viết dấu khác nhau như "khoá"/"khóa") để hardcode
- * an toàn — phần nhận diện cột vẫn cần phán đoán ngữ nghĩa của LLM, chỉ phần ĐẾM
- * (hàng nghìn dòng) mới chuyển sang JS miễn phí.
- */
-async function identifyColumns(headerRow, sampleRows) {
-  const schema = {
-    type: "object",
-    properties: {
-      keywordCol: { type: "integer" },
-      urlCol: { type: "integer" },
-      topCol: { type: "integer" },
-      lyDo: { type: "string" },
-    },
-    required: ["keywordCol", "urlCol", "topCol", "lyDo"],
-    additionalProperties: false,
-  };
-  const system = `Cho 1 dòng header CSV (đánh số cột từ 0) và vài dòng dữ liệu mẫu của file check TOP từ khoá SEO. Xác định đúng 3 chỉ số cột (0-based):
-- keywordCol: cột chứa từ khoá/anchor text.
-- urlCol: cột chứa URL đích chính (nếu có nhiều cột URL, chọn cột URL "chính thức"/"đúng", không phải URL do công cụ tự dò được).
-- topCol: cột chứa THỨ HẠNG HIỆN TẠI (current rank) của từ khoá — đây là cột dễ nhầm nhất, đọc kỹ:
-  * Nếu có cột tên đúng là "Now" hoặc tương đương ý nghĩa "hiện tại", ưu tiên chọn cột đó — đây gần như luôn là cột TOP hiện tại thật.
-  * Các cột có tên ngày tháng (VD "2026-07-09") là lịch sử thứ hạng theo từng ngày kiểm tra trước đó — KHÔNG dùng, trừ khi không có cột "Now" thì mới cân nhắc.
-  * Các cột như "TOP lên AIO"/"AIO"/chỉ số liên quan AI Overview KHÔNG PHẢI cột thứ hạng hiện tại — dễ gây nhầm lẫn vì có chữ "TOP" nhưng ý nghĩa khác hẳn, TUYỆT ĐỐI không chọn nhầm cột này.
-  * Dữ liệu mẫu ở cột TOP thật thường là số nguyên nhỏ (1-100) hoặc "-"/rỗng (nghĩa là out TOP).
-Nếu không chắc chắn tuyệt đối, chọn phương án hợp lý nhất và giải thích ngắn trong lyDo. Chỉ trả JSON đúng schema.`;
-  const userText = `Header (index: tên cột):\n${headerRow.map((h, i) => `${i}: ${h}`).join("\n")}\n\nDòng dữ liệu mẫu:\n${sampleRows
-    .map((r) => JSON.stringify(r))
-    .join("\n")}`;
-  const result = await callClaude({ system, userText, maxTokens: 500, jsonSchema: schema });
-  return result;
+/** Đoán cột TOP hiện tại: ưu tiên khớp đúng "now", tránh nhầm với cột "AIO" (chỉ số AI Overview, không phải rank). */
+function guessTopColumn(headerRow) {
+  const lower = headerRow.map((h) => h.trim().toLowerCase());
+  let idx = lower.findIndex((h) => h === "now" || h.includes("now"));
+  if (idx !== -1) return idx;
+  idx = lower.findIndex((h) => !h.includes("aio") && (h.includes("vị trí") || h.includes("vi tri") || h.includes("position") || h.includes("rank")));
+  if (idx !== -1) return idx;
+  idx = lower.findIndex((h) => !h.includes("aio") && h.includes("top"));
+  return idx;
+}
+
+function guessKeywordColumn(headerRow) {
+  return findColumnIndex(headerRow, ["từ khoá", "từ khóa", "tu khoa", "keyword", "anchor"]);
+}
+
+function guessUrlColumn(headerRow) {
+  return findColumnIndex(headerRow, ["url", "link", "trang đích", "trang dich"]);
 }
 
 function parseTopValue(raw) {
@@ -179,53 +118,115 @@ function parseTopValue(raw) {
   return parseInt(digits, 10);
 }
 
+/** Lọc bớt dòng chắc chắn bị loại (Note nêu rõ tạm dừng/dừng bán) trước khi gửi CSV giá lên Claude — không đổi kết quả, chỉ giảm token. */
+function preFilterExcludedRows(csvText) {
+  const rows = parseCSV(csvText);
+  if (rows.length < 2) return csvText;
+  const header = rows[0];
+  const noteIdx = findColumnIndex(header, ["ghi chú", "ghi chu", "note", "trạng thái", "trang thai"]);
+  if (noteIdx === -1) return csvText;
+  const excludePhrases = ["tạm dừng", "tam dung", "dừng bán", "dung ban", "dừng nhận", "dung nhan", "ngừng nhận", "ngung nhan"];
+  const kept = [header];
+  let removed = 0;
+  for (const r of rows.slice(1)) {
+    const note = (r[noteIdx] || "").toLowerCase();
+    if (excludePhrases.some((p) => note.includes(p))) {
+      removed++;
+      continue;
+    }
+    kept.push(r);
+  }
+  if (removed > 0) {
+    console.log(`preFilterExcludedRows: đã loại ${removed} dòng theo Note (tạm dừng/dừng bán) trước khi gửi lên Claude`);
+  }
+  return kept.map((r) => r.map((f) => (f.includes(",") || f.includes('"') ? '"' + f.replace(/"/g, '""') + '"' : f)).join(",")).join("\n");
+}
+
+// ---------- Khối 2: BTK rows với ô xác nhận cột ----------
+const btkList = document.getElementById("btkList");
+const btkData = new Map(); // id -> { header, rows }
+let btkCounter = 0;
+
+function addBtkRow() {
+  btkCounter += 1;
+  const id = btkCounter;
+  const row = document.createElement("div");
+  row.className = "btk-row";
+  row.dataset.id = id;
+  row.innerHTML = `
+    <div class="row">
+      <input type="text" class="btk-name" placeholder="Tên BTK (VD: Thương hiệu)" value="BTK ${id}" />
+      <input type="file" class="btk-file" accept=".csv,.txt" />
+      <button type="button" class="remove-btk">Xoá</button>
+    </div>
+    <div class="btk-col-confirm hidden">
+      <label>Cột Từ khoá: <select class="col-keyword"></select></label>
+      <label>Cột TOP hiện tại: <select class="col-top"></select></label>
+      <label>Cột URL: <select class="col-url"></select></label>
+    </div>
+  `;
+  row.querySelector(".remove-btk").addEventListener("click", () => {
+    if (btkList.children.length > 1) {
+      btkData.delete(id);
+      row.remove();
+    }
+  });
+  row.querySelector(".btk-file").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    const confirmBox = row.querySelector(".btk-col-confirm");
+    if (!file) {
+      confirmBox.classList.add("hidden");
+      btkData.delete(id);
+      return;
+    }
+    const text = await readFileAsText(file);
+    const parsed = parseCSV(text);
+    if (parsed.length < 2) {
+      setStatus(document.getElementById("freeStatus"), `File BTK "${row.querySelector(".btk-name").value}" không đọc được dữ liệu.`, "error");
+      confirmBox.classList.add("hidden");
+      return;
+    }
+    const header = parsed[0];
+    btkData.set(id, { header, rows: parsed.slice(1) });
+
+    const options = header.map((h, i) => `<option value="${i}">${i}: ${esc(h)}</option>`).join("");
+    const selKeyword = row.querySelector(".col-keyword");
+    const selTop = row.querySelector(".col-top");
+    const selUrl = row.querySelector(".col-url");
+    selKeyword.innerHTML = options;
+    selTop.innerHTML = options;
+    selUrl.innerHTML = options;
+    const gKeyword = guessKeywordColumn(header);
+    const gTop = guessTopColumn(header);
+    const gUrl = guessUrlColumn(header);
+    if (gKeyword !== -1) selKeyword.value = gKeyword;
+    if (gTop !== -1) selTop.value = gTop;
+    if (gUrl !== -1) selUrl.value = gUrl;
+    confirmBox.classList.remove("hidden");
+  });
+  btkList.appendChild(row);
+}
+document.getElementById("addBtkBtn").addEventListener("click", addBtkRow);
+addBtkRow();
+
 /**
- * Thực hiện Bước 1-4 của skill top-rank-backlink-analysis: NHẬN DIỆN cột qua
- * 1 lệnh gọi Claude rất nhỏ mỗi BTK (xem identifyColumns), sau đó ĐẾM/LỌC
- * toàn bộ hàng bằng JS thuần — không tốn thêm token dù file dài hàng nghìn dòng.
- * Trả về: { topStats, candidates, top1to10 } — chỉ candidates (đã lọc)
- * và top1to10 (chỉ dùng khi có KPI) mới được gửi lên Claude ở bước ghép cụm.
+ * Bước 1-4 của skill top-rank-backlink-analysis: thống kê TOP theo BTK,
+ * %keyword_in_top10 theo URL, lọc ứng viên. 100% JS thuần, đồng bộ,
+ * KHÔNG gọi API — cột đã được người dùng xác nhận qua dropdown ở Khối 2.
  */
-async function computeStage1Local(btkBlocks) {
+function computeStage1Free(btkBlocks) {
   const topStats = [];
   const candidates = [];
   const top1to10 = [];
-  const skippedNoTopColumn = [];
 
-  for (const { name, text } of btkBlocks) {
-    const rows = parseCSV(text);
-    if (rows.length < 2) continue;
-    const header = rows[0];
-
-    let keywordIdx, urlIdx, topIdx;
-    try {
-      const detected = await identifyColumns(header, rows.slice(1, 4));
-      keywordIdx = detected.keywordCol;
-      urlIdx = detected.urlCol;
-      topIdx = detected.topCol;
-      if (
-        !Number.isInteger(keywordIdx) ||
-        !Number.isInteger(urlIdx) ||
-        !Number.isInteger(topIdx) ||
-        keywordIdx < 0 ||
-        urlIdx < 0 ||
-        topIdx < 0 ||
-        keywordIdx >= header.length ||
-        urlIdx >= header.length ||
-        topIdx >= header.length
-      ) {
-        throw new Error("Chỉ số cột không hợp lệ");
-      }
-    } catch (e) {
-      skippedNoTopColumn.push(name);
-      continue;
-    }
-
-    const dataRows = rows.slice(1).map((r) => ({
-      keyword: (r[keywordIdx] || "").trim(),
-      url: (r[urlIdx] || "").trim(),
-      top: parseTopValue(r[topIdx]),
-    })).filter((r) => r.keyword);
+  for (const { name, header, rows, keywordIdx, urlIdx, topIdx } of btkBlocks) {
+    const dataRows = rows
+      .map((r) => ({
+        keyword: (r[keywordIdx] || "").trim(),
+        url: (r[urlIdx] || "").trim(),
+        top: parseTopValue(r[topIdx]),
+      }))
+      .filter((r) => r.keyword);
 
     const stat = { btk: name, tongSo: 0, top1_3: 0, top1_5: 0, top1_10: 0, top10_20: 0, top20_30: 0, outTop30: 0 };
     for (const r of dataRows) {
@@ -239,7 +240,6 @@ async function computeStage1Local(btkBlocks) {
     }
     topStats.push(stat);
 
-    // Thống kê theo URL để áp dụng quy tắc Bước 4
     const byUrl = new Map();
     for (const r of dataRows) {
       if (!r.url) continue;
@@ -272,37 +272,93 @@ async function computeStage1Local(btkBlocks) {
     }
   }
 
-  return { topStats, candidates, top1to10, skippedNoTopColumn };
+  return { topStats, candidates, top1to10 };
 }
 
-/** Lọc bớt dòng chắc chắn bị loại (Note nêu rõ tạm dừng/dừng bán) trước khi gửi CSV giá lên Claude — không đổi kết quả, chỉ giảm token. */
-function preFilterExcludedRows(csvText) {
-  const rows = parseCSV(csvText);
-  if (rows.length < 2) return csvText;
-  const header = rows[0];
-  const noteIdx = findColumnIndex(header, ["ghi chú", "ghi chu", "note", "trạng thái", "trang thai"]);
-  if (noteIdx === -1) return csvText;
-  const excludePhrases = ["tạm dừng", "tam dung", "dừng bán", "dung ban", "dừng nhận", "dung nhan", "ngừng nhận", "ngung nhan"];
-  const kept = [header];
-  let removed = 0;
-  for (const r of rows.slice(1)) {
-    const note = (r[noteIdx] || "").toLowerCase();
-    if (excludePhrases.some((p) => note.includes(p))) {
-      removed++;
-      continue;
+let freeResult = null;
+
+document.getElementById("runFreeBtn").addEventListener("click", () => {
+  const statusEl = document.getElementById("freeStatus");
+  try {
+    const rows = Array.from(btkList.querySelectorAll(".btk-row"));
+    const btkBlocks = [];
+    for (const row of rows) {
+      const id = Number(row.dataset.id);
+      const data = btkData.get(id);
+      if (!data) continue;
+      const name = row.querySelector(".btk-name").value.trim() || "BTK";
+      const keywordIdx = Number(row.querySelector(".col-keyword").value);
+      const topIdx = Number(row.querySelector(".col-top").value);
+      const urlIdx = Number(row.querySelector(".col-url").value);
+      btkBlocks.push({ name, header: data.header, rows: data.rows, keywordIdx, topIdx, urlIdx });
     }
-    kept.push(r);
+    if (btkBlocks.length === 0) throw new Error("Cần upload ít nhất 1 file check TOP và xác nhận cột.");
+
+    freeResult = computeStage1Free(btkBlocks);
+    if (freeResult.candidates.length === 0) {
+      setStatus(
+        statusEl,
+        "Không có từ khoá nào đạt điều kiện đề xuất offpage (TOP 10-20 hoặc TOP 20-30 ở URL gần thắng). Kiểm tra lại cột đã chọn hoặc file check TOP.",
+        "error"
+      );
+    } else {
+      setStatus(statusEl, `Xong — ${freeResult.candidates.length} từ khoá ứng viên. Không tốn phí.`, "ok");
+    }
+
+    renderFreeResult(freeResult);
+    document.getElementById("khoi2-results").classList.remove("hidden");
+    document.getElementById("khoi3").classList.remove("hidden");
+  } catch (err) {
+    setStatus(statusEl, "Lỗi: " + err.message, "error");
   }
-  if (removed > 0) {
-    console.log(`preFilterExcludedRows: đã loại ${removed} dòng theo Note (tạm dừng/dừng bán) trước khi gửi lên Claude`);
-  }
-  return kept.map((r) => r.map((f) => (f.includes(",") || f.includes('"') ? '"' + f.replace(/"/g, '""') + '"' : f)).join(",")).join("\n");
+});
+
+function renderFreeResult(result) {
+  const statsTable = document.getElementById("topStatsTable");
+  statsTable.innerHTML =
+    "<tr><th>BTK</th><th>Tổng từ</th><th>TOP 1-3</th><th>TOP 1-5</th><th>TOP 1-10</th><th>TOP 10-20</th><th>TOP 20-30</th><th>Out TOP 30</th></tr>" +
+    result.topStats
+      .map(
+        (r) =>
+          `<tr><td>${esc(r.btk)}</td><td>${r.tongSo}</td><td>${r.top1_3}</td><td>${r.top1_5}</td><td>${r.top1_10}</td><td>${r.top10_20}</td><td>${r.top20_30}</td><td>${r.outTop30}</td></tr>`
+      )
+      .join("");
+
+  const candTable = document.getElementById("candidatesTable");
+  candTable.innerHTML =
+    "<tr><th>#</th><th>BTK</th><th>Anchor</th><th>URL</th><th>TOP</th><th>Lý do</th></tr>" +
+    result.candidates
+      .map(
+        (r, i) =>
+          `<tr><td>${i + 1}</td><td>${esc(r.btk)}</td><td>${esc(r.anchor)}</td><td>${esc(r.url)}</td><td>${r.top}</td><td>${esc(
+            r.lyDo
+          )}</td></tr>`
+      )
+      .join("");
 }
 
-// ---------- Anthropic call ----------
+// ---------- Khối 3: API key ----------
+const apiKeyInput = document.getElementById("apiKey");
+const saveKeyCheckbox = document.getElementById("saveKey");
+const modelSelect = document.getElementById("model");
+
+(function loadSavedKey() {
+  const saved = localStorage.getItem("offpage_api_key");
+  if (saved) apiKeyInput.value = saved;
+})();
+apiKeyInput.addEventListener("change", () => {
+  if (saveKeyCheckbox.checked) localStorage.setItem("offpage_api_key", apiKeyInput.value.trim());
+});
+saveKeyCheckbox.addEventListener("change", () => {
+  if (!saveKeyCheckbox.checked) localStorage.removeItem("offpage_api_key");
+});
+function getApiKey() {
+  return apiKeyInput.value.trim();
+}
+
 async function callClaude({ system, userText, maxTokens, jsonSchema }) {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Chưa nhập API key.");
+  if (!apiKey) throw new Error("Chưa nhập API key ở Khối 3.");
   const model = modelSelect.value;
 
   const body = {
@@ -310,9 +366,7 @@ async function callClaude({ system, userText, maxTokens, jsonSchema }) {
     max_tokens: maxTokens,
     system: [{ type: "text", text: system }],
     messages: [{ role: "user", content: userText }],
-    output_config: {
-      format: { type: "json_schema", schema: jsonSchema },
-    },
+    output_config: { format: { type: "json_schema", schema: jsonSchema } },
   };
 
   const resp = await fetch(CONFIG.ANTHROPIC_API_URL, {
@@ -332,9 +386,7 @@ async function callClaude({ system, userText, maxTokens, jsonSchema }) {
     throw new Error(msg);
   }
   if (data.stop_reason === "refusal") {
-    throw new Error(
-      "Claude từ chối xử lý yêu cầu này (an toàn nội dung). Thử lại hoặc kiểm tra dữ liệu đầu vào."
-    );
+    throw new Error("Claude từ chối xử lý yêu cầu này (an toàn nội dung). Thử lại hoặc kiểm tra dữ liệu đầu vào.");
   }
   const textBlock = (data.content || []).find((b) => b.type === "text");
   if (!textBlock) throw new Error("Không nhận được kết quả hợp lệ từ Claude.");
@@ -342,9 +394,6 @@ async function callClaude({ system, userText, maxTokens, jsonSchema }) {
 }
 
 // ---------- JSON Schemas ----------
-// topStats KHÔNG nằm trong schema này nữa — được tính 100% bằng JS thuần (xem computeStage1Local),
-// không tốn token và không có rủi ro Claude tính sai. Chỉ phần cần phán đoán ngữ nghĩa (ghép cụm anchor)
-// mới gọi Claude.
 const STAGE1_SCHEMA = {
   type: "object",
   properties: {
@@ -429,7 +478,7 @@ const STAGE2_SCHEMA = {
   additionalProperties: false,
 };
 
-// ---------- System prompts (condensed from .claude/skills) ----------
+// ---------- System prompts ----------
 const STAGE1_SYSTEM = `Bạn là chuyên gia kỹ thuật SEO Offpage (tương đương agent seo-offpage-technical trong workspace này).
 
 Bước 1-4 của quy trình (thống kê TOP theo BTK, lọc ứng viên TOP10-20 và TOP20-30 "URL gần thắng") ĐÃ được tính sẵn bằng JavaScript thuần ở phía client — không cần làm lại, không cần kiểm tra lại số liệu đó. Bạn chỉ nhận danh sách "ứng viên đã lọc sẵn" (mảng candidates) và nhiệm vụ của bạn CHỈ là 2 việc dưới đây.
@@ -471,65 +520,31 @@ Người dùng cho trước: x = số báo mong muốn, y = tổng ngân sách b
 
 Chỉ trả về JSON đúng schema đã cho, không thêm giải thích ngoài JSON.`;
 
-// ---------- Stage 1 ----------
-let stage1Result = null;
+// ---------- Khối 3a: ghép cụm anchor ----------
+let clusterResult = null;
 
-document.getElementById("runStage1Btn").addEventListener("click", async () => {
-  const statusEl = document.getElementById("stage1Status");
-  const btn = document.getElementById("runStage1Btn");
+document.getElementById("runClusterBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("clusterStatus");
+  const btn = document.getElementById("runClusterBtn");
   try {
-    if (!getApiKey()) throw new Error("Vui lòng nhập API key ở mục 0 trước.");
-
-    const rows = Array.from(btkList.querySelectorAll(".btk-row"));
-    const btkBlocks = [];
-    for (const row of rows) {
-      const name = row.querySelector(".btk-name").value.trim() || "BTK";
-      const file = row.querySelector(".btk-file").files[0];
-      if (!file) continue;
-      const text = await readFileAsText(file);
-      btkBlocks.push({ name, text });
-    }
-    if (btkBlocks.length === 0) throw new Error("Cần upload ít nhất 1 file check TOP.");
+    if (!freeResult) throw new Error("Cần chạy Khối 2 trước.");
+    if (!getApiKey()) throw new Error("Vui lòng nhập API key ở Khối 3 trước.");
 
     const kpiFile = document.getElementById("kpiFile").files[0];
     const kpiText = kpiFile ? await readFileAsText(kpiFile) : "";
-
-    btn.disabled = true;
-    setStatus(statusEl, "Đang nhận diện cột trong file check TOP (lệnh gọi rất nhỏ)...", "loading");
-
-    // Nhận diện cột (1 lệnh Claude nhỏ/BTK) rồi đếm/lọc toàn bộ hàng bằng JS thuần — miễn phí.
-    const { topStats, candidates, top1to10, skippedNoTopColumn } = await computeStage1Local(btkBlocks);
-    if (skippedNoTopColumn.length > 0) {
-      setStatus(
-        statusEl,
-        `Cảnh báo: không nhận diện được cột Từ khoá/URL/TOP trong file của BTK "${skippedNoTopColumn.join(
-          ", "
-        )}" — đã bỏ qua BTK này.`,
-        "error"
-      );
-    }
-    if (candidates.length === 0) {
-      throw new Error(
-        "Không có từ khoá nào đạt điều kiện đề xuất offpage (TOP 10-20 hoặc TOP 20-30 ở URL gần thắng) sau khi lọc bằng JS. Kiểm tra lại file check TOP."
-      );
-    }
-
     const projectName = document.getElementById("projectName").value.trim() || "(chưa đặt tên)";
 
-    let userText = `Dự án: ${projectName}\n\n### Danh sách ứng viên đã lọc sẵn (Bước 1-4 đã tính bằng JS, tổng ${candidates.length} ứng viên)\n${JSON.stringify(
-      candidates
+    let userText = `Dự án: ${projectName}\n\n### Danh sách ứng viên đã lọc sẵn (Bước 1-4 đã tính bằng JS, tổng ${freeResult.candidates.length} ứng viên)\n${JSON.stringify(
+      freeResult.candidates
     )}`;
     if (kpiText) {
       userText += `\n\n### Danh sách từ khoá đã TOP1-10 theo BTK (chỉ dùng để xét KPI-aware nếu cần)\n${JSON.stringify(
-        top1to10
+        freeResult.top1to10
       )}\n\n### File KPI\n${kpiText}`;
     }
 
-    setStatus(
-      statusEl,
-      `Đã tính thống kê + lọc ${candidates.length} ứng viên bằng JS thuần. Đang gọi Claude để ghép cụm anchor...`,
-      "loading"
-    );
+    btn.disabled = true;
+    setStatus(statusEl, "Đang gọi Claude để ghép cụm anchor...", "loading");
 
     const llmResult = await callClaude({
       system: STAGE1_SYSTEM,
@@ -538,16 +553,10 @@ document.getElementById("runStage1Btn").addEventListener("click", async () => {
       jsonSchema: STAGE1_SCHEMA,
     });
 
-    stage1Result = {
-      topStats, // tính bằng JS, không phải từ Claude
-      anchorClusters: llmResult.anchorClusters,
-      duPhong: llmResult.duPhong,
-    };
-
-    renderStage1(stage1Result);
+    clusterResult = { anchorClusters: llmResult.anchorClusters, duPhong: llmResult.duPhong };
+    renderClusterResult(clusterResult);
     setStatus(statusEl, "Xong.", "ok");
-    document.getElementById("section-stage1-results").classList.remove("hidden");
-    document.getElementById("section-step2").classList.remove("hidden");
+    document.getElementById("khoi3b").classList.remove("hidden");
   } catch (err) {
     setStatus(statusEl, "Lỗi: " + err.message, "error");
   } finally {
@@ -555,17 +564,7 @@ document.getElementById("runStage1Btn").addEventListener("click", async () => {
   }
 });
 
-function renderStage1(result) {
-  const statsTable = document.getElementById("topStatsTable");
-  statsTable.innerHTML =
-    "<tr><th>BTK</th><th>Tổng từ</th><th>TOP 1-3</th><th>TOP 1-5</th><th>TOP 1-10</th><th>TOP 10-20</th><th>TOP 20-30</th><th>Out TOP 30</th></tr>" +
-    result.topStats
-      .map(
-        (r) =>
-          `<tr><td>${esc(r.btk)}</td><td>${r.tongSo}</td><td>${r.top1_3}</td><td>${r.top1_5}</td><td>${r.top1_10}</td><td>${r.top10_20}</td><td>${r.top20_30}</td><td>${r.outTop30}</td></tr>`
-      )
-      .join("");
-
+function renderClusterResult(result) {
   const clusterTable = document.getElementById("anchorClusterTable");
   clusterTable.innerHTML =
     "<tr><th>#</th><th>BTK</th><th>Anchor 1</th><th>URL 1</th><th>Anchor 2</th><th>URL 2</th><th>Mức ghép</th><th>Lý do</th></tr>" +
@@ -583,9 +582,7 @@ function renderStage1(result) {
   const duPhongTable = document.getElementById("duPhongTable");
   duPhongTable.innerHTML =
     "<tr><th>Anchor</th><th>URL</th><th>Lý do</th></tr>" +
-    (result.duPhong || [])
-      .map((r) => `<tr><td>${esc(r.anchor)}</td><td>${esc(r.url)}</td><td>${esc(r.lyDo)}</td></tr>`)
-      .join("");
+    (result.duPhong || []).map((r) => `<tr><td>${esc(r.anchor)}</td><td>${esc(r.url)}</td><td>${esc(r.lyDo)}</td></tr>`).join("");
 }
 
 function mucGhepClass(m) {
@@ -594,13 +591,7 @@ function mucGhepClass(m) {
   return "tag-bridge";
 }
 
-function esc(s) {
-  const div = document.createElement("div");
-  div.textContent = s == null ? "" : String(s);
-  return div.innerHTML;
-}
-
-// ---------- Stage 2: live budget preview ----------
+// ---------- Khối 3b: chọn domain theo ngân sách (live preview) ----------
 function updateBudgetPreview() {
   const el = document.getElementById("tongNganSachPreview");
   if (!el) return;
@@ -620,15 +611,14 @@ function updateBudgetPreview() {
 });
 updateBudgetPreview();
 
-// ---------- Stage 2 ----------
 let stage2Result = null;
 
 document.getElementById("runStage2Btn").addEventListener("click", async () => {
   const statusEl = document.getElementById("stage2Status");
   const btn = document.getElementById("runStage2Btn");
   try {
-    if (!stage1Result) throw new Error("Cần chạy bước 1 trước.");
-    if (!getApiKey()) throw new Error("Vui lòng nhập API key ở mục 0 trước.");
+    if (!clusterResult) throw new Error("Cần ghép cụm anchor (3a) trước.");
+    if (!getApiKey()) throw new Error("Vui lòng nhập API key ở Khối 3 trước.");
 
     btn.disabled = true;
 
@@ -660,8 +650,6 @@ document.getElementById("runStage2Btn").addEventListener("click", async () => {
       }
     }
 
-    // Loại bớt dòng chắc chắn không dùng được (Note ghi tạm dừng/dừng bán) bằng JS trước khi gửi —
-    // không đổi kết quả (đây vốn là quy tắc loại trừ bắt buộc trong prompt), chỉ giảm token.
     const baoCsv = preFilterExcludedRows(baoCsvRaw);
     const gpCsv = preFilterExcludedRows(gpCsvRaw);
 
@@ -679,8 +667,8 @@ Mục tiêu guest post: z = ${gpSoLuong} bài, ngân sách mong muốn/bài ~${g
       "vi-VN"
     )}đ => tổng ngân sách GP n = ${gpTongNganSach.toLocaleString("vi-VN")}đ.
 
-### Cụm anchor đã ghép (output bước 1, JSON)
-${JSON.stringify(stage1Result.anchorClusters)}
+### Cụm anchor đã ghép (output 3a, JSON)
+${JSON.stringify(clusterResult.anchorClusters)}
 
 ### Bảng giá báo PR dofollow (nguồn: ${baoSource})
 ${baoCsv}
@@ -704,7 +692,7 @@ ${gpCsv}`;
 
     renderStage2(stage2Result);
     setStatus(statusEl, "Xong.", "ok");
-    document.getElementById("section-stage2-results").classList.remove("hidden");
+    document.getElementById("khoi3-results").classList.remove("hidden");
   } catch (err) {
     setStatus(statusEl, "Lỗi: " + err.message, "error");
   } finally {
@@ -722,9 +710,7 @@ function renderStage2(result) {
         (r) =>
           `<tr><td>${esc(r.domain)}</td><td>${esc(r.dr)}</td><td>${r.gia.toLocaleString("vi-VN")}đ</td><td>${esc(
             r.anchor1
-          )}</td><td>${esc(r.url1)}</td><td>${esc(r.anchor2)}</td><td>${esc(r.url2)}</td><td>${esc(
-            r.ghiChu
-          )}</td></tr>`
+          )}</td><td>${esc(r.url1)}</td><td>${esc(r.anchor2)}</td><td>${esc(r.url2)}</td><td>${esc(r.ghiChu)}</td></tr>`
       )
       .join("");
 
@@ -751,22 +737,19 @@ function renderStage2(result) {
 
 // ---------- Export xlsx ----------
 document.getElementById("exportBtn").addEventListener("click", () => {
-  if (!stage1Result || !stage2Result) return;
+  if (!clusterResult || !stage2Result) return;
   const wb = XLSX.utils.book_new();
 
   const overview = [
     ["KẾ HOẠCH OFFPAGE"],
-    [
-      "Tổng ngân sách",
-      (stage2Result.tongNganSachBao + stage2Result.tongNganSachGp).toLocaleString("vi-VN") + "đ",
-    ],
+    ["Tổng ngân sách", (stage2Result.tongNganSachBao + stage2Result.tongNganSachGp).toLocaleString("vi-VN") + "đ"],
     ["Ghi chú", stage2Result.ghiChuChung],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(overview), "Tổng quan");
 
   const anchorRows = [
     ["BTK", "Anchor 1", "URL 1", "Anchor 2", "URL 2", "Mức ghép", "Lý do"],
-    ...stage1Result.anchorClusters.map((r) => [r.btk, r.anchor1, r.url1, r.anchor2, r.url2, r.mucGhep, r.lyDo]),
+    ...clusterResult.anchorClusters.map((r) => [r.btk, r.anchor1, r.url1, r.anchor2, r.url2, r.mucGhep, r.lyDo]),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(anchorRows), "Cụm Anchor");
 

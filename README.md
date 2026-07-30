@@ -17,6 +17,8 @@ Landing page tĩnh (GitHub Pages, không backend), chia rõ 3 khối:
 2. **Phần miễn phí** — upload file check TOP, JS chạy thẳng trong trình duyệt (thống kê TOP theo BTK, lọc từ khoá ứng viên đáng đầu tư offpage) và trả kết quả ngay, **không cần API key**.
 3. **Phần cần trả phí** — ghép cụm anchor theo chủ đề + chọn domain báo/GP theo ngân sách, cần Claude thật sự hiểu ngữ cảnh nên bắt buộc dùng API key Anthropic của chính người dùng (bring-your-own-key, gọi thẳng tới Anthropic, không qua server nào của mình).
 
+> **Lưu ý:** đây chỉ là bản build thử (proof of concept), không có hosting riêng/trả phí — chạy trên GitHub Pages miễn phí, dừng ở mức thao tác cơ bản, chưa đầu tư hoàn thiện thêm vì không muốn phát sinh chi phí duy trì. Công việc thật hàng ngày của mình vẫn thực hiện trực tiếp trên VS Code tích hợp Claude Code, không qua web app này.
+
 Xem chi tiết kiến trúc ở [`docs/README.md`](docs/README.md).
 
 ## Đọc trước

@@ -4,6 +4,8 @@ Trang web tĩnh (không backend), người khác mở lên tự nhập input (fi
 
 **Link chạy thật:** https://nguyenthilinhtrang.github.io/offpage-bao-gp/
 
+> **Lưu ý:** đây là bản build thử (proof of concept) minh hoạ hệ thống agent/skill có thể chạy được ngoài Claude Code, không phải sản phẩm chính thức. Không có hosting riêng hay trả phí duy trì — chạy trên GitHub Pages miễn phí, cố tình dừng ở mức thao tác cơ bản để không phát sinh chi phí (kể cả chi phí gọi API khi test). Công việc offpage thật hàng ngày vẫn thực hiện trực tiếp trên VS Code tích hợp Claude Code, không qua web app này.
+
 ## Cấu trúc trang — 3 khối
 
 1. **Khối 1 — Giới thiệu**: thuần text, giải thích công cụ là gì, làm gì, phần nào miễn phí/phần nào mất phí.

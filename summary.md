@@ -24,8 +24,12 @@ Cập nhật lần cuối: 2026-07-13
 - Xem đầy đủ ở [CLAUDE.md](CLAUDE.md) mục "Quy ước dữ liệu".
 - Repo GitHub: public, tên `offpage-bao-gp` — https://github.com/nguyenthilinhtrang/offpage-bao-gp (đã xác nhận với user chấp nhận public dù `data/` chứa số điện thoại vendor + tên khách hàng thật).
 
+## Bằng chứng vận hành (thêm ngày 2026-07-30, sau deadline 28/07)
+
+- **Lịch sử trò chuyện BTVN buổi 4**: `exports/hoptri-offpage-2026-07-12.md` — export từ session Claude Code gốc ngày 12-13/07 (lúc build agent/skill + chạy thử dự án Hợp Trí). File này được thêm vào repo ngày 30/07, tức **sau** deadline nộp bài (28/07 23h59) — ghi chú rõ ở đây để minh bạch, tránh hiểu nhầm là làm sát nút.
+- **Demo chạy thật** (`exports/demo-seo-offpage-technical.cast` + `.gif`, ghi ngày 30/07 bằng `asciinema`+`agg`): terminal recording gọi `claude --agent seo-offpage-technical` phân tích trực tiếp `data/hoptri/btk1-thuong-hieu-checktop.csv` (74 từ khoá) bằng skill `top-rank-backlink-analysis` — output thật, không dàn dựng trước (agent tự tính lại % TOP, tự phát hiện KPI lệch ngày snapshot, tự đề xuất 4 anchor + cảnh báo "URL cô lập" cần ghép chéo BTK khác).
+
 ## Việc còn dang dở / chưa làm
 
-- **File `.txt` export lịch sử chat** (`/export`) — cần user tự chạy trong phiên Claude Code (lệnh CLI, agent không tự gọi được), sau đó commit vào repo.
 - **Nâng cấp skill sang code Python có test** (tham khảo cấu trúc `scripts/` + `tests/` + `state/` của workspace `seo-workspace` — xem repo tham khảo https://github.com/minhdo01011990-glitch/seo-workspace) — hiện 8 skill của workspace này đều ở dạng hướng dẫn markdown thuần (Claude tự làm thủ công theo bước), chưa có script/test riêng. Việc này sẽ giúp các phần tính toán (chọn domain theo ngân sách, kiểm tra khác-URL...) chắc chắn đúng 100% thay vì dựa vào model tự nhớ quy tắc mỗi lần chạy — nên làm ở buổi học sau, không phải việc gấp.
 - `offpage-content` chưa được chạy thử thật với 1 bài viết hoàn chỉnh nào.

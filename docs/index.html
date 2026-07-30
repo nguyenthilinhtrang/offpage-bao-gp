@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent Offpage — Lập kế hoạch SEO Offpage</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="page-header">
+  <h1>Agent Offpage — Lập kế hoạch SEO Offpage</h1>
+  <p class="subtitle">
+    Nhập file check TOP + ngân sách của bạn, hệ thống sẽ tự phân tích và đề xuất anchor text + domain báo/guest post,
+    dựa trên đúng quy trình 2 agent <code>seo-offpage-technical</code> → <code>offpage-pm</code>.
+  </p>
+  <p class="notice">
+    Trang này chạy hoàn toàn trên trình duyệt của bạn — <strong>không có server nào lưu trữ API key hay dữ liệu</strong>.
+    Bạn cần tự cung cấp Anthropic API key của mình (xem hướng dẫn bên dưới).
+  </p>
+</header>
+
+<main>
+
+  <section class="card" id="section-apikey">
+    <h2>0. API key</h2>
+    <p>
+      Lấy key tại <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>.
+      Key chỉ lưu trong <code>localStorage</code> của trình duyệt bạn, không gửi đi đâu khác ngoài Anthropic.
+    </p>
+    <div class="row">
+      <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" />
+      <label class="checkbox-label">
+        <input type="checkbox" id="saveKey" checked /> Ghi nhớ key trên máy này
+      </label>
+    </div>
+    <div class="row">
+      <label>Model &nbsp;
+        <select id="model">
+          <option value="claude-opus-5" selected>Claude Opus 5 (khuyến nghị, đắt nhất, chất lượng cao nhất)</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 (cân bằng chi phí/chất lượng)</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 (rẻ nhất, dùng thử nhanh)</option>
+        </select>
+      </label>
+    </div>
+    <p class="hint" id="costHint"></p>
+  </section>
+
+  <section class="card" id="section-step1">
+    <h2>1. Phân tích TOP &amp; đề xuất anchor text</h2>
+    <p class="hint">Tương ứng agent <code>seo-offpage-technical</code>.</p>
+
+    <div class="row">
+      <label>Tên dự án &nbsp;<input type="text" id="projectName" placeholder="VD: Hợp Trí" /></label>
+    </div>
+
+    <div id="btkList"></div>
+    <button type="button" class="btn-secondary" id="addBtkBtn">+ Thêm bộ từ khoá (BTK) khác</button>
+
+    <div class="row">
+      <label>File KPI (tuỳ chọn, CSV) &nbsp;<input type="file" id="kpiFile" accept=".csv,.txt" /></label>
+    </div>
+
+    <button type="button" class="btn-primary" id="runStage1Btn">Phân tích Anchor Text</button>
+    <div class="status" id="stage1Status"></div>
+  </section>
+
+  <section class="card hidden" id="section-stage1-results">
+    <h2>Kết quả bước 1</h2>
+    <h3>Thống kê phân bố TOP theo BTK</h3>
+    <div class="table-wrap"><table id="topStatsTable"></table></div>
+    <h3>Cụm anchor text đã ghép</h3>
+    <div class="table-wrap"><table id="anchorClusterTable"></table></div>
+    <h3>Dự phòng (chưa dùng)</h3>
+    <div class="table-wrap"><table id="duPhongTable"></table></div>
+  </section>
+
+  <section class="card hidden" id="section-step2">
+    <h2>2. Chọn domain báo &amp; guest post theo ngân sách</h2>
+    <p class="hint">Tương ứng agent <code>offpage-pm</code>. Bảng giá được lấy sống từ Google Sheet chung của công ty.</p>
+    <div class="row">
+      <label>Ngân sách báo tối thiểu (đ) &nbsp;<input type="number" id="baoMin" value="5000000" step="100000" /></label>
+      <label>Ngân sách báo tối đa (đ) &nbsp;<input type="number" id="baoMax" value="7500000" step="100000" /></label>
+    </div>
+    <div class="row">
+      <label>Ngân sách guest post (đ) &nbsp;<input type="number" id="gpBudget" value="8000000" step="100000" /></label>
+    </div>
+    <p class="hint" id="tokenWarning"></p>
+    <button type="button" class="btn-primary" id="runStage2Btn">Chọn Domain &amp; Ngân sách</button>
+    <div class="status" id="stage2Status"></div>
+  </section>
+
+  <section class="card hidden" id="section-stage2-results">
+    <h2>Kết quả bước 2 — Kế hoạch offpage cuối cùng</h2>
+    <div class="table-wrap"><table id="baoTable"></table></div>
+    <div class="table-wrap"><table id="gpTable"></table></div>
+    <p id="tongNganSach" class="total-line"></p>
+    <button type="button" class="btn-primary" id="exportBtn">Tải file Excel</button>
+  </section>
+
+</main>
+
+<footer>
+  <p>Web app tĩnh (GitHub Pages), gọi trực tiếp Anthropic API từ trình duyệt — không backend, không lưu trữ dữ liệu.</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

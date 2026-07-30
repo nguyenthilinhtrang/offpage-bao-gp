@@ -8,6 +8,10 @@ Hệ thống 3 agent + 8 skill cho quy trình SEO Offpage (đi báo PR + guest p
 
 ![Demo agent seo-offpage-technical](exports/demo-seo-offpage-technical.gif)
 
+## Web app — dùng thử trực tiếp trên trình duyệt
+
+Landing page tĩnh (GitHub Pages, không backend) để người khác tự nhập file check TOP + ngân sách và nhận ngay bảng anchor text + domain báo/GP, dùng API key Anthropic của chính họ (bring-your-own-key, không qua server nào). Xem chi tiết kiến trúc ở [`docs/README.md`](docs/README.md).
+
 ## Đọc trước
 
 - [`summary.md`](summary.md) — trạng thái dự án, kết quả chạy thử thật (dự án Hợp Trí + Sunlife), lỗi đã phát hiện & sửa.

@@ -9,23 +9,50 @@
 <body>
 <header class="page-header">
   <h1>Agent Offpage — Lập kế hoạch SEO Offpage</h1>
-  <p class="subtitle">
-    Nhập file check TOP + ngân sách của bạn, hệ thống sẽ tự phân tích và đề xuất anchor text + domain báo/guest post,
-    dựa trên đúng quy trình 2 agent <code>seo-offpage-technical</code> → <code>offpage-pm</code>.
-  </p>
-  <p class="notice">
-    Trang này chạy hoàn toàn trên trình duyệt của bạn — <strong>không có server nào lưu trữ API key hay dữ liệu</strong>.
-    Bạn cần tự cung cấp Anthropic API key của mình (xem hướng dẫn bên dưới).
-  </p>
 </header>
 
 <main>
 
+  <section class="card" id="section-intro">
+    <h2>Đây là gì?</h2>
+    <p>
+      Công cụ tự động hoá quy trình <strong>lên kế hoạch đi báo PR + guest post (SEO Offpage)</strong>:
+      bạn nộp file check TOP từ khoá + ngân sách, công cụ trả về danh sách anchor text nên đi + domain báo/GP cụ thể nên chọn.
+      Chạy đúng theo quy trình 2 bước:
+    </p>
+    <ol class="pipeline-steps">
+      <li><strong>Bước 1 — Phân tích &amp; đề xuất anchor text.</strong> Đọc file check TOP, tìm từ khoá đáng đầu tư offpage, ghép mỗi 2 anchor text thành 1 cụm cho 1 bài (theo đúng logic ngành).</li>
+      <li><strong>Bước 2 — Chọn domain theo ngân sách.</strong> Từ cụm anchor ở bước 1, chọn domain báo/guest post phù hợp lĩnh vực, đúng ngân sách bạn đặt ra.</li>
+    </ol>
+
+    <table class="cost-table">
+      <tr>
+        <th></th>
+        <th>Miễn phí (chạy trong trình duyệt)</th>
+        <th>Cần API key, có tính phí</th>
+      </tr>
+      <tr>
+        <td>Bước 1</td>
+        <td>Thống kê TOP theo bộ từ khoá, lọc từ khoá đáng đầu tư — tính bằng JS, dù file dài mấy nghìn dòng cũng không tốn phí.</td>
+        <td>Nhận diện đúng cột trong file CSV của bạn (1 lệnh rất nhỏ/file) + ghép cụm anchor theo chủ đề (cần Claude hiểu ngữ cảnh ngành).</td>
+      </tr>
+      <tr>
+        <td>Bước 2</td>
+        <td>Lọc bớt domain rõ ràng không dùng được (Note ghi "tạm dừng"/"dừng bán") — tính bằng JS.</td>
+        <td>Khớp danh mục ngành + chọn domain đúng ngân sách (cần Claude phán đoán ngữ nghĩa).</td>
+      </tr>
+    </table>
+    <p class="hint">
+      Chi phí phần "cần API key" tuỳ vào model bạn chọn và độ dài file — công cụ hiện số token ước tính trước mỗi lần gọi để bạn chủ động.
+      Bạn tự trả chi phí này bằng API key của mình, không qua bất kỳ server nào của chúng tôi.
+    </p>
+  </section>
+
   <section class="card" id="section-apikey">
-    <h2>0. API key</h2>
+    <h2>0. API key của bạn</h2>
     <p>
       Lấy key tại <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>.
-      Key chỉ lưu trong <code>localStorage</code> của trình duyệt bạn, không gửi đi đâu khác ngoài Anthropic.
+      Key chỉ lưu trong <code>localStorage</code> của trình duyệt bạn, gọi thẳng tới Anthropic — không có server trung gian nào của chúng tôi nhìn thấy key này.
     </p>
     <div class="row">
       <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" />
@@ -42,15 +69,24 @@
         </select>
       </label>
     </div>
-    <p class="hint" id="costHint"></p>
   </section>
 
   <section class="card" id="section-step1">
-    <h2>1. Phân tích TOP &amp; đề xuất anchor text</h2>
+    <h2>1. File check TOP &amp; đề xuất anchor text</h2>
     <p class="hint">Tương ứng agent <code>seo-offpage-technical</code>.</p>
 
     <div class="row">
       <label>Tên dự án &nbsp;<input type="text" id="projectName" placeholder="VD: Hợp Trí" /></label>
+    </div>
+
+    <div class="input-note">
+      <strong>File check TOP cần gì?</strong> Công cụ tự nhận diện 3 cột trong file bạn upload — không cần đặt đúng tên cột, không cần đúng thứ tự cột:
+      <ul>
+        <li><strong>Từ khoá</strong> — cột chứa từ khoá/anchor text.</li>
+        <li><strong>TOP hiện tại (mới nhất)</strong> — thứ hạng hiện tại, không phải cột lịch sử theo ngày. Nếu file có cột tên "Now" hoặc tương đương, công cụ ưu tiên chọn cột đó.</li>
+        <li><strong>URL</strong> — trang đích của từ khoá đó.</li>
+      </ul>
+      Các cột khác trong file (Volume, DA, ghi chú...) không bắt buộc — công cụ bỏ qua, không ảnh hưởng kết quả, bạn không cần xoá chúng đi.
     </div>
 
     <div id="btkList"></div>
@@ -59,6 +95,7 @@
     <div class="row">
       <label>File KPI (tuỳ chọn, CSV) &nbsp;<input type="file" id="kpiFile" accept=".csv,.txt" /></label>
     </div>
+    <p class="hint">Có file KPI thì công cụ sẽ ưu tiên thêm các từ khoá cần đẩy để đạt KPI, kể cả khi từ đó đã TOP1-10.</p>
 
     <button type="button" class="btn-primary" id="runStage1Btn">Phân tích Anchor Text</button>
     <div class="status" id="stage1Status"></div>
@@ -76,15 +113,30 @@
 
   <section class="card hidden" id="section-step2">
     <h2>2. Chọn domain báo &amp; guest post theo ngân sách</h2>
-    <p class="hint">Tương ứng agent <code>offpage-pm</code>. Bảng giá được lấy sống từ Google Sheet chung của công ty.</p>
-    <div class="row">
-      <label>Ngân sách báo tối thiểu (đ) &nbsp;<input type="number" id="baoMin" value="5000000" step="100000" /></label>
-      <label>Ngân sách báo tối đa (đ) &nbsp;<input type="number" id="baoMax" value="7500000" step="100000" /></label>
+    <p class="hint">Tương ứng agent <code>offpage-pm</code>.</p>
+
+    <div class="input-note">
+      <strong>Danh sách domain báo/GP:</strong> nếu bạn đã có sẵn danh sách domain phù hợp (đã lọc lĩnh vực từ trước), upload file CSV ở đây để dùng luôn.
+      Nếu không có, để trống — công cụ tự lấy bảng giá sống từ Google Sheet chung của công ty (đầy đủ báo tỉnh/báo thường + guest post đa ngành).
     </div>
     <div class="row">
-      <label>Ngân sách guest post (đ) &nbsp;<input type="number" id="gpBudget" value="8000000" step="100000" /></label>
+      <label>Danh sách báo đã có sẵn (tuỳ chọn, CSV) &nbsp;<input type="file" id="baoListFile" accept=".csv,.txt" /></label>
     </div>
-    <p class="hint" id="tokenWarning"></p>
+    <div class="row">
+      <label>Danh sách guest post đã có sẵn (tuỳ chọn, CSV) &nbsp;<input type="file" id="gpListFile" accept=".csv,.txt" /></label>
+    </div>
+
+    <h3>Ngân sách &amp; mục tiêu số lượng</h3>
+    <div class="row">
+      <label>Số lượng báo mong muốn &nbsp;<input type="number" id="baoSoLuong" value="5" min="0" step="1" /></label>
+      <label>Ngân sách mong muốn / báo (đ) &nbsp;<input type="number" id="baoNganSachMoiBai" value="1200000" step="50000" /></label>
+    </div>
+    <div class="row">
+      <label>Số lượng guest post mong muốn &nbsp;<input type="number" id="gpSoLuong" value="10" min="0" step="1" /></label>
+      <label>Ngân sách mong muốn / guest post (đ) &nbsp;<input type="number" id="gpNganSachMoiBai" value="800000" step="50000" /></label>
+    </div>
+    <p class="hint" id="tongNganSachPreview"></p>
+
     <button type="button" class="btn-primary" id="runStage2Btn">Chọn Domain &amp; Ngân sách</button>
     <div class="status" id="stage2Status"></div>
   </section>

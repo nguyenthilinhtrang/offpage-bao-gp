@@ -452,18 +452,20 @@ Anchor tốt nhưng chưa dùng được (hết đối tác ghép, URL đã đ�
 Chỉ trả về JSON đúng schema đã cho, không thêm giải thích ngoài JSON.`;
 
 const STAGE2_SYSTEM = `Bạn là PM quản lý dự án Offpage (tương đương agent offpage-pm trong workspace này).
-Nhiệm vụ: từ danh sách cụm anchor đã ghép (JSON) + 2 bảng giá sống (báo PR dofollow, guest post) do người dùng cung cấp, chọn domain báo + guest post đúng ngân sách.
+Nhiệm vụ: từ danh sách cụm anchor đã ghép (JSON) + danh sách domain báo/guest post (do người dùng cung cấp — có thể là danh sách họ tự lọc sẵn, hoặc bảng giá sống của công ty), chọn domain báo + guest post đúng mục tiêu số lượng và ngân sách.
+
+Người dùng cho trước: x = số báo mong muốn, y = tổng ngân sách báo (= x × giá mong muốn/bài); z = số GP mong muốn, n = tổng ngân sách GP. Đây chỉ là MỤC TIÊU tham khảo — không ép chọn đủ x/z bằng mọi giá nếu danh sách domain không đủ lựa chọn phù hợp.
 
 ## Nguyên tắc lọc domain
 - Ưu tiên domain dofollow ("Link Do" = 2 hoặc tương đương). Domain "Link Do = 0" hoặc cần mua thêm mới dofollow thì loại trừ khi ngân sách cho phép mua thêm và đã cộng đúng chi phí ẩn đó vào tổng.
 - Loại domain có Note "tạm dừng nhận", "dừng bán", hoặc mô hình tính phí khác theo bài (VD textlink theo tháng, gói theo năm) trừ khi không còn lựa chọn nào khác.
-- Với guest post: lọc theo đúng danh mục ngành của website khách nếu sheet có danh mục phù hợp. Nếu không có danh mục ngành đúng nghĩa, dùng nhóm "Tin tổng hợp (đa ngành)" làm phương án thay thế hợp lý (site đa chủ đề, chấp nhận nhiều topic).
+- Với guest post: lọc theo đúng danh mục ngành của website khách nếu danh sách có cột danh mục phù hợp. Nếu không có danh mục ngành đúng nghĩa, dùng nhóm "Tin tổng hợp (đa ngành)" làm phương án thay thế hợp lý (site đa chủ đề, chấp nhận nhiều topic).
 - Domain thuộc mảng coin/forex: cộng phụ phí +20% vào đơn giá trước khi tính tổng.
 
 ## Chọn theo ngân sách (bài toán subset selection)
-1. Kiểm tra tính khả thi: giá trung bình mục tiêu = ngân sách / số lượng cần chọn. Nếu phi thực tế so với giá thực tế trong sheet, vẫn chọn tốt nhất có thể nhưng ghi rõ trong ghiChuChung rằng không hoàn toàn khả thi.
+1. Kiểm tra tính khả thi: giá trung bình mục tiêu = y/x (báo) hoặc n/z (GP). Nếu phi thực tế so với giá thực tế trong danh sách, vẫn chọn tốt nhất có thể nhưng ghi rõ trong ghiChuChung rằng không hoàn toàn khả thi.
 2. Sắp xếp theo hiệu quả DR/Giá (báo) hoặc DA-DR/Giá (GP) giảm dần, ưu tiên khung giá phổ biến: báo 1.000.000–2.000.000đ/bài, GP 500.000–1.000.000đ/bài (khung tham chiếu, không cứng nhắc nếu ngân sách khác).
-3. Chọn tới khi tổng giá gần ngân sách nhất có thể, độ lệch mục tiêu <=10%. Nếu không đạt được, chọn phương án gần nhất và ghi rõ trong ghiChuChung.
+3. Chọn đúng x báo và z GP nếu danh sách đủ lựa chọn phù hợp, sao cho tổng giá gần y/n nhất có thể, độ lệch mục tiêu <=10%. Nếu không đạt được (thiếu domain phù hợp hoặc lệch ngân sách), chọn phương án gần nhất và ghi rõ lý do trong ghiChuChung — không tự ý chọn thêm domain không phù hợp chỉ để đủ số.
 4. Gán đúng 1 cụm anchor (2 anchor, 2 URL khác nhau — GIỮ NGUYÊN cặp đã ghép ở bước 1, không tự ghép lại) cho mỗi domain đã chọn. Không gán trùng 1 cụm anchor cho 2 domain khác nhau. Ưu tiên gán cụm "Mạnh"/"Mạnh-khá" cho báo (chi phí cao hơn, rủi ro thương hiệu cao hơn), để cụm "Bridge" xuống guest post nếu có thể.
 5. Nếu số cụm anchor nhiều hơn số domain có thể chọn trong ngân sách, phần dư không đưa vào baoDaChon/gpDaChon — ghi rõ số lượng còn dư trong ghiChuChung.
 
@@ -598,6 +600,26 @@ function esc(s) {
   return div.innerHTML;
 }
 
+// ---------- Stage 2: live budget preview ----------
+function updateBudgetPreview() {
+  const el = document.getElementById("tongNganSachPreview");
+  if (!el) return;
+  const baoSoLuong = Number(document.getElementById("baoSoLuong").value) || 0;
+  const baoNganSachMoiBai = Number(document.getElementById("baoNganSachMoiBai").value) || 0;
+  const gpSoLuong = Number(document.getElementById("gpSoLuong").value) || 0;
+  const gpNganSachMoiBai = Number(document.getElementById("gpNganSachMoiBai").value) || 0;
+  const tongBao = baoSoLuong * baoNganSachMoiBai;
+  const tongGp = gpSoLuong * gpNganSachMoiBai;
+  el.textContent = `Tổng ngân sách dự kiến: ${(tongBao + tongGp).toLocaleString("vi-VN")}đ (Báo: ${tongBao.toLocaleString(
+    "vi-VN"
+  )}đ, GP: ${tongGp.toLocaleString("vi-VN")}đ)`;
+}
+["baoSoLuong", "baoNganSachMoiBai", "gpSoLuong", "gpNganSachMoiBai"].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", updateBudgetPreview);
+});
+updateBudgetPreview();
+
 // ---------- Stage 2 ----------
 let stage2Result = null;
 
@@ -609,35 +631,64 @@ document.getElementById("runStage2Btn").addEventListener("click", async () => {
     if (!getApiKey()) throw new Error("Vui lòng nhập API key ở mục 0 trước.");
 
     btn.disabled = true;
-    setStatus(statusEl, "Đang tải bảng giá sống từ Google Sheet...", "loading");
-    const [baoCsvRaw, gpCsvRaw] = await Promise.all([
-      fetchGoogleSheetCsv(CONFIG.BAO_SHEET_CSV_URL),
-      fetchGoogleSheetCsv(CONFIG.GP_SHEET_CSV_URL),
-    ]);
+
+    const baoListFile = document.getElementById("baoListFile").files[0];
+    const gpListFile = document.getElementById("gpListFile").files[0];
+
+    let baoCsvRaw, gpCsvRaw, baoSource, gpSource;
+    if (baoListFile) {
+      baoCsvRaw = await readFileAsText(baoListFile);
+      baoSource = "danh sách bạn tự cung cấp";
+    }
+    if (gpListFile) {
+      gpCsvRaw = await readFileAsText(gpListFile);
+      gpSource = "danh sách bạn tự cung cấp";
+    }
+    if (!baoListFile || !gpListFile) {
+      setStatus(statusEl, "Đang tải bảng giá sống từ Google Sheet...", "loading");
+      const [baoLive, gpLive] = await Promise.all([
+        baoListFile ? Promise.resolve(null) : fetchGoogleSheetCsv(CONFIG.BAO_SHEET_CSV_URL),
+        gpListFile ? Promise.resolve(null) : fetchGoogleSheetCsv(CONFIG.GP_SHEET_CSV_URL),
+      ]);
+      if (baoLive != null) {
+        baoCsvRaw = baoLive;
+        baoSource = "Google Sheet giá báo chung của công ty";
+      }
+      if (gpLive != null) {
+        gpCsvRaw = gpLive;
+        gpSource = "Google Sheet giá guest post chung của công ty";
+      }
+    }
+
     // Loại bớt dòng chắc chắn không dùng được (Note ghi tạm dừng/dừng bán) bằng JS trước khi gửi —
     // không đổi kết quả (đây vốn là quy tắc loại trừ bắt buộc trong prompt), chỉ giảm token.
     const baoCsv = preFilterExcludedRows(baoCsvRaw);
     const gpCsv = preFilterExcludedRows(gpCsvRaw);
 
-    const baoMin = Number(document.getElementById("baoMin").value);
-    const baoMax = Number(document.getElementById("baoMax").value);
-    const gpBudget = Number(document.getElementById("gpBudget").value);
+    const baoSoLuong = Number(document.getElementById("baoSoLuong").value) || 0;
+    const baoNganSachMoiBai = Number(document.getElementById("baoNganSachMoiBai").value) || 0;
+    const gpSoLuong = Number(document.getElementById("gpSoLuong").value) || 0;
+    const gpNganSachMoiBai = Number(document.getElementById("gpNganSachMoiBai").value) || 0;
+    const baoTongNganSach = baoSoLuong * baoNganSachMoiBai;
+    const gpTongNganSach = gpSoLuong * gpNganSachMoiBai;
 
-    const userText = `Ngân sách báo: ${baoMin.toLocaleString("vi-VN")} - ${baoMax.toLocaleString(
+    const userText = `Mục tiêu báo: x = ${baoSoLuong} bài, ngân sách mong muốn/bài ~${baoNganSachMoiBai.toLocaleString(
       "vi-VN"
-    )}đ. Ngân sách guest post: ${gpBudget.toLocaleString("vi-VN")}đ.
+    )}đ => tổng ngân sách báo y = ${baoTongNganSach.toLocaleString("vi-VN")}đ.
+Mục tiêu guest post: z = ${gpSoLuong} bài, ngân sách mong muốn/bài ~${gpNganSachMoiBai.toLocaleString(
+      "vi-VN"
+    )}đ => tổng ngân sách GP n = ${gpTongNganSach.toLocaleString("vi-VN")}đ.
 
 ### Cụm anchor đã ghép (output bước 1, JSON)
 ${JSON.stringify(stage1Result.anchorClusters)}
 
-### Bảng giá báo PR dofollow (CSV sống)
+### Bảng giá báo PR dofollow (nguồn: ${baoSource})
 ${baoCsv}
 
-### Bảng giá guest post (CSV sống)
+### Bảng giá guest post (nguồn: ${gpSource})
 ${gpCsv}`;
 
     const estTokens = estimateTokens(userText);
-    document.getElementById("tokenWarning").textContent = "";
     setStatus(
       statusEl,
       `Đang chọn domain theo ngân sách (~${estTokens.toLocaleString("vi-VN")} token input, có thể mất 1-2 phút)...`,

@@ -10,7 +10,14 @@ Hệ thống 3 agent + 8 skill cho quy trình SEO Offpage (đi báo PR + guest p
 
 ## Web app — dùng thử trực tiếp trên trình duyệt
 
-Landing page tĩnh (GitHub Pages, không backend) để người khác tự nhập file check TOP + ngân sách và nhận ngay bảng anchor text + domain báo/GP, dùng API key Anthropic của chính họ (bring-your-own-key, không qua server nào). Xem chi tiết kiến trúc ở [`docs/README.md`](docs/README.md).
+**Link chạy thật: https://nguyenthilinhtrang.github.io/offpage-bao-gp/**
+
+Landing page tĩnh (GitHub Pages, không backend), chia rõ 3 khối:
+1. **Giới thiệu** — trang này là gì, làm được gì, phần nào miễn phí/phần nào mất phí.
+2. **Phần miễn phí** — upload file check TOP, JS chạy thẳng trong trình duyệt (thống kê TOP theo BTK, lọc từ khoá ứng viên đáng đầu tư offpage) và trả kết quả ngay, **không cần API key**.
+3. **Phần cần trả phí** — ghép cụm anchor theo chủ đề + chọn domain báo/GP theo ngân sách, cần Claude thật sự hiểu ngữ cảnh nên bắt buộc dùng API key Anthropic của chính người dùng (bring-your-own-key, gọi thẳng tới Anthropic, không qua server nào của mình).
+
+Xem chi tiết kiến trúc ở [`docs/README.md`](docs/README.md).
 
 ## Đọc trước
 

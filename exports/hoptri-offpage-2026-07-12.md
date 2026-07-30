@@ -1298,6 +1298,8 @@ _2026-07-12T17:11:00.083Z_
 
 https://github.com/minhdo01011990-glitch/seo-workspace tham khảo phần này xem tôi còn thiếu gì kh
 
+> **[Chú thích bổ sung ngày 2026-07-30, không phải nguyên văn gốc]** Mục đích câu lệnh này chỉ để đối chiếu **cấu trúc kỹ thuật/tổ chức code** (thư mục `scripts/`, `tests/`, `state/` — cách tách skill thành script có test) của 1 workspace tham khảo, để biết hướng nâng cấp kỹ thuật cho hệ thống 8 skill hiện tại (đang ở dạng hướng dẫn markdown thuần). Không sao chép nội dung bài làm, dữ liệu, hay đáp án của repo đó — 3 agent, 8 skill, và toàn bộ output offpage trong repo này là tự xây dựng độc lập theo yêu cầu riêng của dự án Hợp Trí/Sunlife.
+
 ---
 
 ## 🤖 Assistant  

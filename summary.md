@@ -12,7 +12,9 @@ Cập nhật lần cuối: 2026-07-13
 - Input: file check TOP thật (2 BTK: "Thương Hiệu" 74 từ khoá, "Thông tin" 370 từ khoá) + bảng KPI T8/2026.
 - `seo-offpage-technical` phân tích TOP, đề xuất anchor, ghép 15 cụm (30 anchor, không trùng URL trong cùng 1 bài, đã gắn nhãn Mạnh/Mạnh-khá/Bridge).
 - `offpage-pm` lọc domain báo (Google Sheet giá báo) + GP (Google Sheet giá GP, dùng nhóm "Tin tổng hợp" vì sheet không có danh mục nông nghiệp đúng nghĩa), chọn 5 báo + 10 GP đúng ngân sách.
-- Output cuối: `outputs/Hop-Tri-Ke-hoach-Offpage.xlsx` — 5 sheet (Tổng quan, 5 Báo, 10 Guest Post, Thống kê TOP & KPI, Dự phòng), tổng ngân sách 13.200.000đ (báo 5.5tr + GP 7.7tr), toàn bộ link dofollow.
+- Output tách theo giai đoạn (từ 2026-07-30, xem quy ước ở CLAUDE.md):
+  - `outputs/hoptri/HopTri-AnchorText-2026-07-13.xlsx` — output `seo-offpage-technical`: thống kê TOP & KPI, 15 cụm anchor đã ghép, dự phòng.
+  - `outputs/hoptri/HopTri-ChonDomain-2026-07-13.xlsx` — output `offpage-pm` (deliverable cuối, trước đây tên `Hop-Tri-Ke-hoach-Offpage.xlsx`): 5 báo + 10 GP kèm anchor/URL/mức ghép, tổng ngân sách 13.200.000đ (báo 5.5tr + GP 7.7tr), toàn bộ link dofollow.
 - `offpage-content` **chưa chạy thật** — chưa có yêu cầu viết content thật cho 15 bài này.
 
 **Đã sửa 2 lỗi phát hiện được trong lúc chạy thử (đã cập nhật vào SKILL.md để không lặp lại):**
@@ -28,6 +30,7 @@ Cập nhật lần cuối: 2026-07-13
 
 - **Lịch sử trò chuyện BTVN buổi 4**: `exports/hoptri-offpage-2026-07-12.md` — export từ session Claude Code gốc ngày 12-13/07 (lúc build agent/skill + chạy thử dự án Hợp Trí). File này được thêm vào repo ngày 30/07, tức **sau** deadline nộp bài (28/07 23h59) — ghi chú rõ ở đây để minh bạch, tránh hiểu nhầm là làm sát nút.
 - **Demo chạy thật** (`exports/demo-seo-offpage-technical.cast` + `.gif`, ghi ngày 30/07 bằng `asciinema`+`agg`): terminal recording gọi `claude --agent seo-offpage-technical` phân tích trực tiếp `data/hoptri/btk1-thuong-hieu-checktop.csv` (74 từ khoá) bằng skill `top-rank-backlink-analysis` — output thật, không dàn dựng trước (agent tự tính lại % TOP, tự phát hiện KPI lệch ngày snapshot, tự đề xuất 4 anchor + cảnh báo "URL cô lập" cần ghép chéo BTK khác).
+- **Cấu trúc lại `outputs/` theo dự án** (30/07): mỗi dự án 1 folder (`outputs/hoptri/`, `outputs/sunlife/`), tách file theo giai đoạn agent thay vì 1 file gộp — xem quy ước ở CLAUDE.md. `Sunlife-Ke-hoach-Offpage.xlsx` đổi tên thành `outputs/sunlife/Sunlife-ChonDomain-2026-07-13.xlsx` (chưa có file `Sunlife-AnchorText-*` vì không tìm lại được bảng cụm anchor gốc của dự án này trong lịch sử session — cần chạy lại `seo-offpage-technical` nếu muốn có file này). Xoá `outputs/Rackcosmo/` — đây là folder rỗng còn sót lại từ 1 phiên chat khác (so sánh nội dung 2 website đối thủ), không phải deliverable của quy trình offpage nên không thuộc `outputs/`.
 
 ## Việc còn dang dở / chưa làm
 

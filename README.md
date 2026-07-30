@@ -20,7 +20,9 @@ Hệ thống 3 agent + 8 skill cho quy trình SEO Offpage (đi báo PR + guest p
 .claude/agents/*.md          # 3 agent
 .claude/skills/<ten-skill>/  # 8 skill
 data/<du-an>/                # dữ liệu trung gian theo dự án
-outputs/<ten-file>.xlsx      # deliverable cuối cùng
+outputs/<du-an>/             # deliverable cuối cùng, tách file theo giai đoạn agent
+  <DuAn>-AnchorText-<ngay>.xlsx   # output seo-offpage-technical (TOP, KPI, cụm anchor)
+  <DuAn>-ChonDomain-<ngay>.xlsx   # output offpage-pm (domain + ngân sách) — deliverable cuối
 exports/                     # lịch sử chat + demo ghi hình
 ```
 

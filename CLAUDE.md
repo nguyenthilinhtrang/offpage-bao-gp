@@ -31,8 +31,14 @@ Workspace này xây dựng 1 hệ thống 3 agent + 8 skill cho quy trình SEO O
 .claude/skills/<ten-skill>/  # 8 skill, mỗi skill có SKILL.md + references/*.md (chỉ load khi cần)
 data/<du-an>/                # dữ liệu trung gian đã export sẵn từ Google Sheet (CSV) cho 1 dự án cụ thể
 data/domain-lists/           # danh sách báo/GP đã lọc sẵn (dùng chung, cập nhật lại khi chạy dự án mới)
-outputs/<ten-file>.xlsx       # deliverable cuối cùng giao cho khách hàng/PM, định dạng Excel dễ xem/copy
+outputs/<du-an>/              # deliverable cuối cùng, 1 folder riêng cho mỗi dự án khách hàng
 ```
+
+**Quy ước output trong `outputs/<du-an>/` — tách theo giai đoạn agent, không gộp chung 1 file:**
+- `<DuAn>-AnchorText-<ngay>.xlsx` — output giai đoạn `seo-offpage-technical` (thống kê TOP & KPI, bảng cụm anchor text đã ghép, danh sách dự phòng). Chưa có domain, dùng để bàn giao cho PM.
+- `<DuAn>-ChonDomain-<ngay>.xlsx` — output giai đoạn `offpage-pm` (domain báo/GP đã chọn kèm anchor/URL tương ứng, ngân sách). Đây là deliverable cuối cùng giao khách hàng.
+- `<ngay>` = ngày hoàn tất giai đoạn đó, định dạng `YYYY-MM-DD`. Ví dụ: `HopTri-AnchorText-2026-07-13.xlsx`, `HopTri-ChonDomain-2026-07-13.xlsx`.
+- Không tạo folder/file output rỗng cho việc không thuộc quy trình offpage (VD so sánh đối thủ, phân tích 1 lần) — những việc đó không đi vào `outputs/`.
 
 ## Nguyên tắc làm việc
 

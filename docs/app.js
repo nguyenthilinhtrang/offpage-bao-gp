@@ -83,6 +83,222 @@ async function fetchGoogleSheetCsv(url) {
   return await resp.text();
 }
 
+// ---------- CSV parsing (thuần JS, không tốn token) ----------
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ",") {
+      row.push(field);
+      field = "";
+    } else if (c === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (c === "\r") {
+      // skip
+    } else {
+      field += c;
+    }
+  }
+  if (field.length || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+}
+
+function findColumnIndex(headerRow, aliases) {
+  const lower = headerRow.map((h) => h.trim().toLowerCase());
+  for (const alias of aliases) {
+    const idx = lower.findIndex((h) => h.includes(alias));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+/**
+ * Nhận diện cột Từ khoá / URL / TOP hiện tại bằng 1 lệnh gọi Claude RẤT nhỏ
+ * (chỉ gửi header + vài dòng mẫu, không gửi toàn bộ file — gần như miễn phí).
+ * BẮT BUỘC dùng LLM ở bước này thay vì alias-matching thuần JS: đã test thực tế
+ * với file check TOP thật trong repo và phát hiện lỗi — cột "TOP lên AIO" (chỉ số
+ * AIO overview, không phải rank) đứng trước cột "Now" (cột TOP thật theo quy ước
+ * CLAUDE.md) và trùng khớp alias "top", khiến matcher JS thuần chọn NHẦM cột, ra
+ * kết quả sai hoàn toàn mà không báo lỗi. Tên cột tiếng Việt biến thiên quá nhiều
+ * giữa các dự án (kể cả 2 cách viết dấu khác nhau như "khoá"/"khóa") để hardcode
+ * an toàn — phần nhận diện cột vẫn cần phán đoán ngữ nghĩa của LLM, chỉ phần ĐẾM
+ * (hàng nghìn dòng) mới chuyển sang JS miễn phí.
+ */
+async function identifyColumns(headerRow, sampleRows) {
+  const schema = {
+    type: "object",
+    properties: {
+      keywordCol: { type: "integer" },
+      urlCol: { type: "integer" },
+      topCol: { type: "integer" },
+      lyDo: { type: "string" },
+    },
+    required: ["keywordCol", "urlCol", "topCol", "lyDo"],
+    additionalProperties: false,
+  };
+  const system = `Cho 1 dòng header CSV (đánh số cột từ 0) và vài dòng dữ liệu mẫu của file check TOP từ khoá SEO. Xác định đúng 3 chỉ số cột (0-based):
+- keywordCol: cột chứa từ khoá/anchor text.
+- urlCol: cột chứa URL đích chính (nếu có nhiều cột URL, chọn cột URL "chính thức"/"đúng", không phải URL do công cụ tự dò được).
+- topCol: cột chứa THỨ HẠNG HIỆN TẠI (current rank) của từ khoá — đây là cột dễ nhầm nhất, đọc kỹ:
+  * Nếu có cột tên đúng là "Now" hoặc tương đương ý nghĩa "hiện tại", ưu tiên chọn cột đó — đây gần như luôn là cột TOP hiện tại thật.
+  * Các cột có tên ngày tháng (VD "2026-07-09") là lịch sử thứ hạng theo từng ngày kiểm tra trước đó — KHÔNG dùng, trừ khi không có cột "Now" thì mới cân nhắc.
+  * Các cột như "TOP lên AIO"/"AIO"/chỉ số liên quan AI Overview KHÔNG PHẢI cột thứ hạng hiện tại — dễ gây nhầm lẫn vì có chữ "TOP" nhưng ý nghĩa khác hẳn, TUYỆT ĐỐI không chọn nhầm cột này.
+  * Dữ liệu mẫu ở cột TOP thật thường là số nguyên nhỏ (1-100) hoặc "-"/rỗng (nghĩa là out TOP).
+Nếu không chắc chắn tuyệt đối, chọn phương án hợp lý nhất và giải thích ngắn trong lyDo. Chỉ trả JSON đúng schema.`;
+  const userText = `Header (index: tên cột):\n${headerRow.map((h, i) => `${i}: ${h}`).join("\n")}\n\nDòng dữ liệu mẫu:\n${sampleRows
+    .map((r) => JSON.stringify(r))
+    .join("\n")}`;
+  const result = await callClaude({ system, userText, maxTokens: 500, jsonSchema: schema });
+  return result;
+}
+
+function parseTopValue(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s === "" || s === "-" || s.toLowerCase() === "n/a" || s.startsWith(">")) return null; // out TOP 30
+  const digits = s.replace(/[^\d]/g, "");
+  if (digits === "") return null;
+  return parseInt(digits, 10);
+}
+
+/**
+ * Thực hiện Bước 1-4 của skill top-rank-backlink-analysis: NHẬN DIỆN cột qua
+ * 1 lệnh gọi Claude rất nhỏ mỗi BTK (xem identifyColumns), sau đó ĐẾM/LỌC
+ * toàn bộ hàng bằng JS thuần — không tốn thêm token dù file dài hàng nghìn dòng.
+ * Trả về: { topStats, candidates, top1to10 } — chỉ candidates (đã lọc)
+ * và top1to10 (chỉ dùng khi có KPI) mới được gửi lên Claude ở bước ghép cụm.
+ */
+async function computeStage1Local(btkBlocks) {
+  const topStats = [];
+  const candidates = [];
+  const top1to10 = [];
+  const skippedNoTopColumn = [];
+
+  for (const { name, text } of btkBlocks) {
+    const rows = parseCSV(text);
+    if (rows.length < 2) continue;
+    const header = rows[0];
+
+    let keywordIdx, urlIdx, topIdx;
+    try {
+      const detected = await identifyColumns(header, rows.slice(1, 4));
+      keywordIdx = detected.keywordCol;
+      urlIdx = detected.urlCol;
+      topIdx = detected.topCol;
+      if (
+        !Number.isInteger(keywordIdx) ||
+        !Number.isInteger(urlIdx) ||
+        !Number.isInteger(topIdx) ||
+        keywordIdx < 0 ||
+        urlIdx < 0 ||
+        topIdx < 0 ||
+        keywordIdx >= header.length ||
+        urlIdx >= header.length ||
+        topIdx >= header.length
+      ) {
+        throw new Error("Chỉ số cột không hợp lệ");
+      }
+    } catch (e) {
+      skippedNoTopColumn.push(name);
+      continue;
+    }
+
+    const dataRows = rows.slice(1).map((r) => ({
+      keyword: (r[keywordIdx] || "").trim(),
+      url: (r[urlIdx] || "").trim(),
+      top: parseTopValue(r[topIdx]),
+    })).filter((r) => r.keyword);
+
+    const stat = { btk: name, tongSo: 0, top1_3: 0, top1_5: 0, top1_10: 0, top10_20: 0, top20_30: 0, outTop30: 0 };
+    for (const r of dataRows) {
+      stat.tongSo++;
+      if (r.top != null && r.top <= 3) stat.top1_3++;
+      if (r.top != null && r.top <= 5) stat.top1_5++;
+      if (r.top != null && r.top <= 10) stat.top1_10++;
+      else if (r.top != null && r.top <= 20) stat.top10_20++;
+      else if (r.top != null && r.top <= 30) stat.top20_30++;
+      else stat.outTop30++;
+    }
+    topStats.push(stat);
+
+    // Thống kê theo URL để áp dụng quy tắc Bước 4
+    const byUrl = new Map();
+    for (const r of dataRows) {
+      if (!r.url) continue;
+      if (!byUrl.has(r.url)) byUrl.set(r.url, []);
+      byUrl.get(r.url).push(r);
+    }
+    const urlPercentTop10 = new Map();
+    for (const [url, items] of byUrl) {
+      const top10Count = items.filter((r) => r.top != null && r.top <= 10).length;
+      urlPercentTop10.set(url, items.length ? top10Count / items.length : 0);
+    }
+
+    for (const r of dataRows) {
+      if (r.top != null && r.top > 10 && r.top <= 20) {
+        candidates.push({ btk: name, anchor: r.keyword, url: r.url, top: r.top, lyDo: "TOP 10-20 (Bước 3)" });
+      } else if (r.top != null && r.top > 20 && r.top <= 30) {
+        const pct = urlPercentTop10.get(r.url) || 0;
+        if (pct > 0.5) {
+          candidates.push({
+            btk: name,
+            anchor: r.keyword,
+            url: r.url,
+            top: r.top,
+            lyDo: `TOP 20-30, URL "gần thắng" (${Math.round(pct * 100)}% từ khoá khác đã TOP10) — Bước 4`,
+          });
+        }
+      } else if (r.top != null && r.top <= 10) {
+        top1to10.push({ btk: name, anchor: r.keyword, url: r.url, top: r.top });
+      }
+    }
+  }
+
+  return { topStats, candidates, top1to10, skippedNoTopColumn };
+}
+
+/** Lọc bớt dòng chắc chắn bị loại (Note nêu rõ tạm dừng/dừng bán) trước khi gửi CSV giá lên Claude — không đổi kết quả, chỉ giảm token. */
+function preFilterExcludedRows(csvText) {
+  const rows = parseCSV(csvText);
+  if (rows.length < 2) return csvText;
+  const header = rows[0];
+  const noteIdx = findColumnIndex(header, ["ghi chú", "ghi chu", "note", "trạng thái", "trang thai"]);
+  if (noteIdx === -1) return csvText;
+  const excludePhrases = ["tạm dừng", "tam dung", "dừng bán", "dung ban", "dừng nhận", "dung nhan", "ngừng nhận", "ngung nhan"];
+  const kept = [header];
+  let removed = 0;
+  for (const r of rows.slice(1)) {
+    const note = (r[noteIdx] || "").toLowerCase();
+    if (excludePhrases.some((p) => note.includes(p))) {
+      removed++;
+      continue;
+    }
+    kept.push(r);
+  }
+  if (removed > 0) {
+    console.log(`preFilterExcludedRows: đã loại ${removed} dòng theo Note (tạm dừng/dừng bán) trước khi gửi lên Claude`);
+  }
+  return kept.map((r) => r.map((f) => (f.includes(",") || f.includes('"') ? '"' + f.replace(/"/g, '""') + '"' : f)).join(",")).join("\n");
+}
+
 // ---------- Anthropic call ----------
 async function callClaude({ system, userText, maxTokens, jsonSchema }) {
   const apiKey = getApiKey();
@@ -126,27 +342,12 @@ async function callClaude({ system, userText, maxTokens, jsonSchema }) {
 }
 
 // ---------- JSON Schemas ----------
+// topStats KHÔNG nằm trong schema này nữa — được tính 100% bằng JS thuần (xem computeStage1Local),
+// không tốn token và không có rủi ro Claude tính sai. Chỉ phần cần phán đoán ngữ nghĩa (ghép cụm anchor)
+// mới gọi Claude.
 const STAGE1_SCHEMA = {
   type: "object",
   properties: {
-    topStats: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          btk: { type: "string" },
-          tongSo: { type: "integer" },
-          top1_3: { type: "integer" },
-          top1_5: { type: "integer" },
-          top1_10: { type: "integer" },
-          top10_20: { type: "integer" },
-          top20_30: { type: "integer" },
-          outTop30: { type: "integer" },
-        },
-        required: ["btk", "tongSo", "top1_3", "top1_5", "top1_10", "top10_20", "top20_30", "outTop30"],
-        additionalProperties: false,
-      },
-    },
     anchorClusters: {
       type: "array",
       items: {
@@ -178,7 +379,7 @@ const STAGE1_SCHEMA = {
       },
     },
   },
-  required: ["topStats", "anchorClusters", "duPhong"],
+  required: ["anchorClusters", "duPhong"],
   additionalProperties: false,
 };
 
@@ -230,27 +431,13 @@ const STAGE2_SCHEMA = {
 
 // ---------- System prompts (condensed from .claude/skills) ----------
 const STAGE1_SYSTEM = `Bạn là chuyên gia kỹ thuật SEO Offpage (tương đương agent seo-offpage-technical trong workspace này).
-Nhiệm vụ: phân tích (các) file check TOP người dùng cung cấp, rồi ghép các anchor text thành từng cụm 2 anchor/bài.
 
-## Bước 1-2: Đọc & thống kê theo BTK
-Mỗi khối dữ liệu người dùng gửi tương ứng 1 BTK (bộ từ khoá), tên BTK đã cho kèm theo. Tự nhận diện cột theo alias:
-- Từ khoá: "Từ khoá"/"Keyword"/"Anchor"
-- URL: "URL"/"Link"/"Trang đích"
-- TOP hiện tại: "TOP"/"Vị trí"/"Position"/"Rank" (rỗng/"-"/">30" => out TOP 30)
-Với mỗi BTK, đếm số từ khoá theo khoảng: TOP 1-3, TOP 1-5 (cộng dồn), TOP 1-10 (cộng dồn), TOP 10-20, TOP 20-30, Out TOP 30.
+Bước 1-4 của quy trình (thống kê TOP theo BTK, lọc ứng viên TOP10-20 và TOP20-30 "URL gần thắng") ĐÃ được tính sẵn bằng JavaScript thuần ở phía client — không cần làm lại, không cần kiểm tra lại số liệu đó. Bạn chỉ nhận danh sách "ứng viên đã lọc sẵn" (mảng candidates) và nhiệm vụ của bạn CHỈ là 2 việc dưới đây.
 
-## Bước 3: Lọc từ khoá ưu tiên
-- Ưu tiên đề xuất: TOP 10-20.
-- Cân nhắc thêm: TOP 20-30 nếu URL chứa từ đó có nhiều từ khác đã TOP 10 (xem Bước 4).
-- Loại: out TOP 30 — offpage không có tác động ở khoảng cách xa.
-- Từ đã TOP 1-10 mặc định KHÔNG đề xuất, TRỪ KHI có file KPI cho thấy mốc KPI gần hơn (VD TOP5) chưa đạt dù đã TOP1-3 rộng — trường hợp này vẫn ưu tiên đề xuất để đóng gap KPI, ghi rõ lý do "KPI-aware" trong lyDo.
+## Việc 1 — Xét KPI-aware (chỉ khi có mảng top1to10 và file KPI đính kèm)
+Nếu có mảng "top1to10" (các từ khoá đã TOP1-10, do JS liệt kê sẵn theo BTK) và có file KPI, đối chiếu: nếu mốc KPI gần hơn (VD TOP5) của 1 BTK chưa đạt dù nhiều từ đã TOP1-3, hãy CHỌN THÊM một số từ khoá phù hợp nhất từ top1to10 của đúng BTK đó (ưu tiên từ đang gần ngưỡng KPI nhất) làm ứng viên bổ sung, gộp vào danh sách ứng viên để ghép cụm ở Việc 2, ghi lý do "KPI-aware" rõ ràng. Nếu không có file KPI hoặc top1to10 rỗng, bỏ qua việc này hoàn toàn.
 
-## Bước 4: Phân tích theo URL
-%keyword_in_top10 = số từ TOP1-10 / tổng từ trỏ về URL đó.
-- URL có %keyword_in_top10 > 50% nhưng các từ còn lại đang TOP 10-30 => ưu tiên cao, offpage cho các từ còn lại.
-- URL không có từ nào TOP10 và toàn bộ out TOP20 => loại khỏi phạm vi.
-
-## Bước 5: Ghép cụm anchor (2 anchor/bài)
+## Việc 2 — Ghép cụm anchor (2 anchor/bài)
 QUY TẮC BẮT BUỘC (kiểm tra trước mọi quy tắc khác): 2 anchor trong CÙNG 1 cụm phải trỏ 2 URL đích KHÁC NHAU — không bao giờ ghép 2 anchor cùng URL vào chung 1 bài. Nếu 1 URL có nhiều anchor tốt (biến thể từ khoá), mỗi anchor phải "xuất khẩu" ghép với anchor thuộc URL khác, ở các cụm khác nhau.
 Điều kiện ghép hợp lý (đạt 1 trong 2):
 - Cùng đối tượng/ngữ cảnh cụ thể (không chỉ cùng ngành lớn) => nhãn "Mạnh".
@@ -298,27 +485,62 @@ document.getElementById("runStage1Btn").addEventListener("click", async () => {
       const file = row.querySelector(".btk-file").files[0];
       if (!file) continue;
       const text = await readFileAsText(file);
-      btkBlocks.push(`### BTK: ${name}\n${text}`);
+      btkBlocks.push({ name, text });
     }
     if (btkBlocks.length === 0) throw new Error("Cần upload ít nhất 1 file check TOP.");
 
     const kpiFile = document.getElementById("kpiFile").files[0];
     const kpiText = kpiFile ? await readFileAsText(kpiFile) : "";
 
+    btn.disabled = true;
+    setStatus(statusEl, "Đang nhận diện cột trong file check TOP (lệnh gọi rất nhỏ)...", "loading");
+
+    // Nhận diện cột (1 lệnh Claude nhỏ/BTK) rồi đếm/lọc toàn bộ hàng bằng JS thuần — miễn phí.
+    const { topStats, candidates, top1to10, skippedNoTopColumn } = await computeStage1Local(btkBlocks);
+    if (skippedNoTopColumn.length > 0) {
+      setStatus(
+        statusEl,
+        `Cảnh báo: không nhận diện được cột Từ khoá/URL/TOP trong file của BTK "${skippedNoTopColumn.join(
+          ", "
+        )}" — đã bỏ qua BTK này.`,
+        "error"
+      );
+    }
+    if (candidates.length === 0) {
+      throw new Error(
+        "Không có từ khoá nào đạt điều kiện đề xuất offpage (TOP 10-20 hoặc TOP 20-30 ở URL gần thắng) sau khi lọc bằng JS. Kiểm tra lại file check TOP."
+      );
+    }
+
     const projectName = document.getElementById("projectName").value.trim() || "(chưa đặt tên)";
 
-    let userText = `Dự án: ${projectName}\n\n` + btkBlocks.join("\n\n");
-    if (kpiText) userText += `\n\n### File KPI\n${kpiText}`;
+    let userText = `Dự án: ${projectName}\n\n### Danh sách ứng viên đã lọc sẵn (Bước 1-4 đã tính bằng JS, tổng ${candidates.length} ứng viên)\n${JSON.stringify(
+      candidates
+    )}`;
+    if (kpiText) {
+      userText += `\n\n### Danh sách từ khoá đã TOP1-10 theo BTK (chỉ dùng để xét KPI-aware nếu cần)\n${JSON.stringify(
+        top1to10
+      )}\n\n### File KPI\n${kpiText}`;
+    }
 
-    btn.disabled = true;
-    setStatus(statusEl, "Đang phân tích TOP + ghép anchor (có thể mất 30–90 giây)...", "loading");
+    setStatus(
+      statusEl,
+      `Đã tính thống kê + lọc ${candidates.length} ứng viên bằng JS thuần. Đang gọi Claude để ghép cụm anchor...`,
+      "loading"
+    );
 
-    stage1Result = await callClaude({
+    const llmResult = await callClaude({
       system: STAGE1_SYSTEM,
       userText,
       maxTokens: CONFIG.MAX_TOKENS_STAGE1,
       jsonSchema: STAGE1_SCHEMA,
     });
+
+    stage1Result = {
+      topStats, // tính bằng JS, không phải từ Claude
+      anchorClusters: llmResult.anchorClusters,
+      duPhong: llmResult.duPhong,
+    };
 
     renderStage1(stage1Result);
     setStatus(statusEl, "Xong.", "ok");
@@ -388,10 +610,14 @@ document.getElementById("runStage2Btn").addEventListener("click", async () => {
 
     btn.disabled = true;
     setStatus(statusEl, "Đang tải bảng giá sống từ Google Sheet...", "loading");
-    const [baoCsv, gpCsv] = await Promise.all([
+    const [baoCsvRaw, gpCsvRaw] = await Promise.all([
       fetchGoogleSheetCsv(CONFIG.BAO_SHEET_CSV_URL),
       fetchGoogleSheetCsv(CONFIG.GP_SHEET_CSV_URL),
     ]);
+    // Loại bớt dòng chắc chắn không dùng được (Note ghi tạm dừng/dừng bán) bằng JS trước khi gửi —
+    // không đổi kết quả (đây vốn là quy tắc loại trừ bắt buộc trong prompt), chỉ giảm token.
+    const baoCsv = preFilterExcludedRows(baoCsvRaw);
+    const gpCsv = preFilterExcludedRows(gpCsvRaw);
 
     const baoMin = Number(document.getElementById("baoMin").value);
     const baoMax = Number(document.getElementById("baoMax").value);

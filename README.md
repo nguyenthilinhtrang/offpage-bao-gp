@@ -17,8 +17,6 @@ Landing page tĩnh (GitHub Pages, không backend), chia rõ 3 khối:
 2. **Phần miễn phí** — upload file check TOP, JS chạy thẳng trong trình duyệt (thống kê TOP theo BTK, lọc từ khoá ứng viên đáng đầu tư offpage) và trả kết quả ngay, **không cần API key**.
 3. **Phần cần trả phí** — ghép cụm anchor theo chủ đề + chọn domain báo/GP theo ngân sách, cần Claude thật sự hiểu ngữ cảnh nên bắt buộc dùng API key Anthropic của chính người dùng (bring-your-own-key, gọi thẳng tới Anthropic, không qua server nào của mình).
 
-> **Lưu ý:** repo này sẽ chuyển về private sau ngày 31/07/2026 vì lý do bảo mật (dữ liệu dự án khách hàng thật trong `data/`). Hiện đang để public tạm thời để thuận tiện cho việc quét/chấm bài.
-
 Xem chi tiết kiến trúc ở [`docs/README.md`](docs/README.md).
 
 ## Đọc trước

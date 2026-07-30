@@ -4,8 +4,6 @@ Trang web tĩnh (không backend), người khác mở lên tự nhập input (fi
 
 **Link chạy thật:** https://nguyenthilinhtrang.github.io/offpage-bao-gp/
 
-> **Lưu ý:** repo này sẽ chuyển về private sau ngày 31/07/2026 vì lý do bảo mật (dữ liệu dự án khách hàng thật trong `data/`). Hiện đang để public tạm thời để thuận tiện cho việc quét/chấm bài.
-
 ## Cấu trúc trang — 3 khối
 
 1. **Khối 1 — Giới thiệu**: thuần text, giải thích công cụ là gì, làm gì, phần nào miễn phí/phần nào mất phí.
